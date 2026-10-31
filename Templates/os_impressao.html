@@ -71,7 +71,7 @@
         <section class="mb-8">
             <h3 class="bg-black text-white font-bold px-3 py-1 mb-3 uppercase text-[10px] tracking-widest inline-block">Escopo do Projeto e Execução</h3>
             <div class="border-2 border-black p-5 min-h-[280px]">
-                {% set detalhes_limpos = os.detalhes.split('<br><hr><br><b>📍 HISTÓRICO DE RASTREIO:</b>')[0] %}
+                {% set detalhes_limpos = (os.detalhes or '').split('<br><hr><br><b>📍 HISTÓRICO DE RASTREIO:</b>')[0] %}
                 <pre class="font-sans text-sm whitespace-pre-wrap leading-relaxed">{{ detalhes_limpos | safe }}</pre>
             </div>
         </section>

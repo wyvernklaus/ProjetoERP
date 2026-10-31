@@ -211,7 +211,7 @@ async def relatorio_ponto_funcionarios(request: Request, usuario_logado: str = C
 
 @router.post("/api/admin/importar-ponto")
 async def importar_ponto(arquivo_afd: UploadFile = File(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    if not decodificar_token(usuario_logado): return RedirectResponse(url="/", status_code=302)
+    if not verificar_acesso("administracao", usuario_logado, db): return RedirectResponse(url="/dashboard", status_code=302)
     conteudo = await arquivo_afd.read()
     conteudo_texto = conteudo.decode("utf-8", errors="ignore")
     

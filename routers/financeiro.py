@@ -40,8 +40,9 @@ async def criar_lancamento(
     categoria: str = Form("Geral"), data_vencimento: str = Form(...),
     usuario_logado: str = Cookie(None), db: Session = Depends(get_db)
 ):
-    username = decodificar_token(usuario_logado)
-    if not username: raise HTTPException(status_code=401)
+    usuario_db = verificar_acesso("administracao", usuario_logado, db) or verificar_acesso("gerencia", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     
     novo = LancamentoFinanceiro(
         tipo=tipo, descricao=descricao.strip(), valor=valor,
@@ -54,7 +55,7 @@ async def criar_lancamento(
 
 @router.post("/api/financeiro/baixar")
 async def baixar_lancamento(id_lancamento: int = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    if not decodificar_token(usuario_logado): raise HTTPException(status_code=401)
+    if not (verificar_acesso("administracao", usuario_logado, db) or verificar_acesso("gerencia", usuario_logado, db)): raise HTTPException(status_code=403)
     
     lanc = db.query(LancamentoFinanceiro).filter(LancamentoFinanceiro.id == id_lancamento).first()
     if lanc:

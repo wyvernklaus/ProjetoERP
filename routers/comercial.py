@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from core.database import get_db
 from core.auth import verificar_acesso, decodificar_token
+from core.security import sanitizar_html
 from core.modelos import Notificacao, OrdemServico, Cliente, CatalogoServico, ProdutoEstoque, Empresa
 from typing import List
 import os
@@ -42,6 +43,7 @@ async def aba_comercial(request: Request, usuario_logado: str = Cookie(None), db
 
 @router.post("/api/comercial/novo-cliente")
 async def criar_cliente(empresa_id: int = Form(0), nome: str = Form(...), setor_unidade: str = Form(""), telefone: str = Form(""), endereco: str = Form(""), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     emp_id_salvar = empresa_id if empresa_id > 0 else None
     db.add(Cliente(empresa_id=emp_id_salvar, nome=nome.strip(), setor_unidade=setor_unidade.strip(), telefone=telefone.strip(), endereco_padrao=endereco.strip()))
     db.commit()
@@ -49,6 +51,7 @@ async def criar_cliente(empresa_id: int = Form(0), nome: str = Form(...), setor_
 
 @router.post("/api/comercial/editar-cliente")
 async def editar_cliente(id_cliente: int = Form(...), empresa_id: int = Form(0), nome: str = Form(...), setor_unidade: str = Form(""), telefone: str = Form(""), endereco: str = Form(""), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     cli = db.query(Cliente).filter(Cliente.id == id_cliente).first()
     if cli:
         cli.empresa_id = empresa_id if empresa_id > 0 else None
@@ -58,12 +61,14 @@ async def editar_cliente(id_cliente: int = Form(...), empresa_id: int = Form(0),
 
 @router.post("/api/comercial/excluir-cliente")
 async def excluir_cliente(id_cliente: int = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     cli = db.query(Cliente).filter(Cliente.id == id_cliente).first()
     if cli: db.delete(cli); db.commit()
     return RedirectResponse(url="/comercial", status_code=302)
 
 @router.post("/api/comercial/nova-empresa")
 async def criar_empresa(nome_fantasia: str = Form(...), cnpj: str = Form(""), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     db.add(Empresa(nome_fantasia=nome_fantasia.strip(), cnpj=cnpj.strip()))
     db.commit(); return RedirectResponse(url="/comercial", status_code=302)
 
@@ -87,7 +92,9 @@ async def criar_os(
     usuario_logado: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
-    username = decodificar_token(usuario_logado)
+    usuario_db = verificar_acesso("comercial", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
     
     # 🧠 PARTE 1: O SISTEMA APRENDENDO O PADRÃO NOVO
@@ -98,14 +105,14 @@ async def criar_os(
             novo_servico = CatalogoServico(
                 nome=nome_padrao.strip(),
                 setores=setores_padrao,
-                escopo_padrao=detalhes.strip(), # Salva a receita de bolo!
+                escopo_padrao=sanitizar_html(detalhes), # Salva a receita de bolo!
                 materiais_estimados=materiais_padrao.strip() # Salva a lista de compras!
             )
             db.add(novo_servico)
             # Nota: Isso vai pro banco e na próxima vez você pode puxar no Javascript!
             
     # 📄 PARTE 2: CRIANDO A O.S. NORMALMENTE
-    detalhes_formatados = detalhes.strip()
+    detalhes_formatados = sanitizar_html(detalhes)
     detalhes_formatados += f"\n<br><hr><br><b>📍 HISTÓRICO DE RASTREIO:</b>"
     detalhes_formatados += f"\n<br>🟢 <i>[{agora}]</i> - O.S. Emitida pelo Comercial ({username})."
 
@@ -146,32 +153,38 @@ async def criar_os(
 
 @router.get("/os/{id_os}/imprimir", response_class=HTMLResponse)
 async def imprimir_os(id_os: int, request: Request, usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not (verificar_acesso("comercial", usuario_logado, db) or verificar_acesso("gerencia", usuario_logado, db) or verificar_acesso("administracao", usuario_logado, db)):
+        return RedirectResponse(url="/dashboard", status_code=302)
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     return templates.TemplateResponse(request=request, name="os_impressao.html", context={"os": os_db})
 
 @router.post("/api/comercial/editar-os")
 async def editar_os(id_os: int = Form(...), detalhes_add: str = Form(...), tempo_estimado: str = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     if os_db:
-        if detalhes_add.strip(): os_db.detalhes = f"{os_db.detalhes}\n\n[ATUALIZADO]: {detalhes_add.strip()}"
+        if detalhes_add.strip(): os_db.detalhes = f"{os_db.detalhes}\n\n[ATUALIZADO]: {sanitizar_html(detalhes_add)}"
         if tempo_estimado.strip(): os_db.tempo_estimado = tempo_estimado.strip()
         db.commit()
     return RedirectResponse(url="/comercial", status_code=302)
 
 @router.post("/api/comercial/excluir-os")
 async def excluir_os(id_os: int = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     if os_db: db.delete(os_db); db.commit()
     return RedirectResponse(url="/comercial", status_code=302)
 
 @router.post("/api/comercial/verificar-estoque")
-async def verificar_estoque_digitado(texto: str = Form(""), db: Session = Depends(get_db)):
+async def verificar_estoque_digitado(texto: str = Form(""), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     estoque = db.query(ProdutoEstoque).all()
     faltantes = [item.nome for item in estoque if item.nome.lower() in texto.lower() and item.quantidade <= 0]
     return {"faltantes": faltantes}
 
 @router.post("/api/comercial/novo-servico-padrao")
-async def criar_servico_padrao(nome: str = Form(...), setores: List[str] = Form([]), terceirizado: str = Form("nao"), db: Session = Depends(get_db)):
+async def criar_servico_padrao(nome: str = Form(...), setores: List[str] = Form([]), terceirizado: str = Form("nao"), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     db.add(CatalogoServico(nome=nome.strip(), setores="terceirizado" if terceirizado == "sim" else ",".join(setores), terceirizado=(terceirizado == "sim")))
     db.commit()
     return RedirectResponse(url="/comercial", status_code=302)
@@ -184,8 +197,10 @@ async def criar_cliente_ajax(
     telefone: str = Form(""),
     endereco: str = Form(""),
     empresa_nome: str = Form(""),
+    usuario_logado: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not verificar_acesso("comercial", usuario_logado, db): raise HTTPException(status_code=403)
     emp_id_salvar = empresa_id if empresa_id > 0 else None
     novo_cli = Cliente(empresa_id=emp_id_salvar, nome=nome.strip(), setor_unidade=setor_unidade.strip(), telefone=telefone.strip(), endereco_padrao=endereco.strip())
     db.add(novo_cli)
@@ -201,9 +216,6 @@ async def criar_cliente_ajax(
         "status": "sucesso",
         "cliente": {"id": novo_cli.id, "nome": novo_cli.nome, "empresa_id": emp_id_salvar or 0, "empresa": emp_nome, "setor": novo_cli.setor_unidade, "endereco": novo_cli.endereco_padrao, "telefone": novo_cli.telefone}
     })
-    agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
-    texto_formatado += f"\n<br><hr><br><b>📍 HISTÓRICO DE RASTREIO:</b>" 
-    texto_formatado += f"\n<br>🟢 <i>[{agora}]</i> - O.S. Emitida pelo Comercial." 
 
 @router.get("/historico-geral", response_class=HTMLResponse)
 async def historico_geral(request: Request, usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):

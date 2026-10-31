@@ -44,7 +44,8 @@ async def tela_resumo(request: Request, usuario_logado: str = Cookie(None), db: 
 
 # Rota AJAX para riscar a tarefa na tela
 @router.post("/concluir-tarefa/{id_tarefa}")
-async def concluir_tarefa(id_tarefa: int, db: Session = Depends(get_db)):
+async def concluir_tarefa(id_tarefa: int, usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not decodificar_token(usuario_logado): return {"status": "erro"}
     tarefa = db.query(TarefaDiaria).filter(TarefaDiaria.id == id_tarefa).first()
     if tarefa:
         tarefa.concluida = not tarefa.concluida # Inverte o status (marca/desmarca)

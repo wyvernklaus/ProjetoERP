@@ -1,7 +1,7 @@
 import os
 import uvicorn
-from fastapi import FastAPI, Request, Depends, Cookie
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, Request, Depends, Cookie, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from core.auth import decodificar_token, verificar_acesso
 from core.config import settings
 
 # Rotas
-from routers import auth, admin_usuarios, ponto, comercial, utilidades, producao, operacional, manutencao, financeiro, notificacoes, administracao, info, gerencia, instalacao, estoque, resumo
+from routers import auth, admin_usuarios, ponto, comercial, utilidades, producao, operacional, TI, financeiro, notificacoes, administracao, info, gerencia, instalacao, estoque, resumo
 
 # =========================================================
 # INICIALIZAÇÃO DO BANCO DE DADOS
@@ -71,7 +71,19 @@ os.makedirs("uploads/comprovantes_vt", exist_ok=True)
 os.makedirs("uploads/os_anexos", exist_ok=True)
 os.makedirs("static/js", exist_ok=True)
 
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Servir uploads somente para usuários autenticados (protege comprovantes e anexos)
+@app.get("/uploads/{caminho:path}")
+async def servir_upload(caminho: str, usuario_logado: str = Cookie(None)):
+    if not decodificar_token(usuario_logado):
+        raise HTTPException(status_code=401, detail="Acesso negado")
+    caminho_limpo = os.path.normpath(caminho)
+    if caminho_limpo.startswith("..") or os.path.isabs(caminho_limpo):
+        raise HTTPException(status_code=404)
+    arquivo = os.path.join("uploads", caminho_limpo)
+    if not os.path.isfile(arquivo):
+        raise HTTPException(status_code=404)
+    return FileResponse(arquivo)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
@@ -112,7 +124,7 @@ app.include_router(ponto.router)
 app.include_router(comercial.router)
 app.include_router(producao.router)
 app.include_router(operacional.router)
-app.include_router(manutencao.router)
+app.include_router(TI.router)
 app.include_router(administracao.router)
 app.include_router(info.router)
 app.include_router(gerencia.router)

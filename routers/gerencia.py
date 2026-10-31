@@ -19,16 +19,18 @@ async def aba_gerencia(request: Request, usuario_logado: str = Cookie(None), db:
     os_pendentes = db.query(OrdemServico).filter(OrdemServico.status == "Aguardando Gerência").order_by(OrdemServico.id.desc()).all()
     return templates.TemplateResponse(request=request, name="gerencia.html", context={"usuario": usuario_db, "ordens": os_pendentes})
 
-    os_em_andamento = db.query(OrdemServico).filter(OrdemServico.status.notin_(["Aguardando Gerência", "Concluído"])).order_by(OrdemServico.id.desc()).all()
-
 @router.post("/api/gerencia/liberar-os")
 async def liberar_os(id_os: int = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    username = decodificar_token(usuario_logado)
+    usuario_db = verificar_acesso("gerencia", usuario_logado, db) or verificar_acesso("administracao", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     
     if os_db: 
-        # 1. Muda o status para a Produção começar a ver
+        # 1. Muda o status para a Produção começar a ver e registra no histórico
         os_db.status = "Fila"
+        agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
+        os_db.detalhes = (os_db.detalhes or "") + f"\n<br>🔵 <i>[{agora}]</i> - Aprovada pela Gerência. Liberada para Produção."
         
         # 2. Manda notificação para todos os setores envolvidos na O.S.
         setores = os_db.setores_envolvidos.split(',')
@@ -41,14 +43,12 @@ async def liberar_os(id_os: int = Form(...), usuario_logado: str = Cookie(None),
                 ))
         db.commit()
     return RedirectResponse(url="/gerencia", status_code=302)
-# Procure onde você muda o status para aprovado e adicione:
-    agora = datetime.now().strftime("%d/%m/%Y às %H:%M")
-    os_db.detalhes += f"\n<br>🔵 <i>[{agora}]</i> - Aprovada pela Gerência. Liberada para Produção."
-    os_db.status = "Fila Produção" # Ou o status que você usa
 
 @router.post("/api/gerencia/enviar-tarefa")
 async def enviar_tarefa_setor(setor_destino: str = Form(...), mensagem_tarefa: str = Form(...), urgente: str = Form("nao"), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    username = decodificar_token(usuario_logado)
+    usuario_db = verificar_acesso("gerencia", usuario_logado, db) or verificar_acesso("administracao", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     db.add(Notificacao(remetente=username, destinatario_setor=setor_destino, tipo="urgente" if urgente == "sim" else "setor", mensagem=f"[{setor_destino.upper()}] {mensagem_tarefa}", lida=False))
     db.commit()
     return RedirectResponse(url="/gerencia", status_code=302)

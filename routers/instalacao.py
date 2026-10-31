@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Cookie, Form
+from fastapi import APIRouter, Request, Depends, Cookie, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -6,6 +6,7 @@ from datetime import datetime
 from core.database import get_db
 from core.auth import verificar_acesso, decodificar_token
 from core.modelos import OrdemServico
+from html import escape
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -41,7 +42,7 @@ async def concluir_instalacao(
     usuario_logado: str = Cookie(None), 
     db: Session = Depends(get_db)
 ):
-    username = decodificar_token(usuario_logado)
+    if not (verificar_acesso("instalacao", usuario_logado, db) or verificar_acesso("gerencia", usuario_logado, db)): raise HTTPException(status_code=403)
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     
     if os_db:
@@ -50,14 +51,15 @@ async def concluir_instalacao(
         
         # 1. Monta o Comprovante de Assinatura (Fica na área pública)
         bloco_assinatura = ""
-        if assinatura_base64:
+        assinatura_segura = assinatura_base64 if assinatura_base64.strip().lower().startswith("data:image/") else ""
+        if assinatura_segura:
             bloco_assinatura = f"""
             <br><br>
             <div style="background:white; color:black; padding:10px; border-radius:8px; margin-top:10px; max-width:300px; border:2px solid #000; text-align:center;">
                 <p style="font-size:10px; color:#333; font-weight:bold; margin-bottom:5px;">COMPROVANTE OFICIAL DE ENTREGA</p>
-                <img src="{assinatura_base64}" style="width:100%; max-height:100px; object-fit:contain; border-bottom:1px dashed #999; padding-bottom:5px;">
-                <p style="margin:5px 0 0 0; font-weight:bold; text-transform:uppercase; font-size:12px;">{nome_recebedor.strip()}</p>
-                <p style="margin:0; font-size:10px; color:#555;">DOC: {documento_recebedor.strip()}</p>
+                <img src="{assinatura_segura}" style="width:100%; max-height:100px; object-fit:contain; border-bottom:1px dashed #999; padding-bottom:5px;">
+                <p style="margin:5px 0 0 0; font-weight:bold; text-transform:uppercase; font-size:12px;">{escape(nome_recebedor.strip())}</p>
+                <p style="margin:0; font-size:10px; color:#555;">DOC: {escape(documento_recebedor.strip())}</p>
                 <p style="margin:0; font-size:8px; color:#999;">Registado eletronicamente em: {agora}</p>
             </div>
             """

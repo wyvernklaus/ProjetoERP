@@ -12,10 +12,8 @@ templates = Jinja2Templates(directory="templates")
 
 @router.get("/administracao", response_class=HTMLResponse)
 async def aba_administracao(request: Request, usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    username = decodificar_token(usuario_logado)
-    if not username: return RedirectResponse(url="/", status_code=302)
-    usuario_db = db.query(Usuario).filter(Usuario.usuario == username).first()
-    if not usuario_db: return RedirectResponse(url="/", status_code=302)
+    usuario_db = verificar_acesso("administracao", usuario_logado, db)
+    if not usuario_db: return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse(request=request, name="administracao.html", context={"usuario": usuario_db})
 
 # Rotas de Placeholders das outras abas (para não poluir o main)

@@ -37,8 +37,9 @@ async def enviar_tarefa_setor(
     setor_destino: str = Form(...), mensagem_tarefa: str = Form(...), urgente: str = Form("nao"),
     usuario_logado: str = Cookie(None), db: Session = Depends(get_db)
 ):
-    username = decodificar_token(usuario_logado)
-    if not username: raise HTTPException(status_code=401)
+    usuario_db = verificar_acesso("administracao", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
 
     tipo_notif = "urgente" if urgente == "sim" else "setor"
     nova_tarefa = Notificacao(

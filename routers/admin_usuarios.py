@@ -101,7 +101,17 @@ async def solicitar_reset_senha(id_usuario: int = Form(...), usuario_logado: str
         segredo_unico = settings.SECRET_KEY + func_db.senha_hash 
         token_reset = jwt.encode(token_payload, segredo_unico, algorithm=settings.ALGORITHM)
         link_seguro = f"{settings.URL_BASE}/recuperar-senha?token={token_reset}"
-        corpo_email = f"""<html>... (corpo do e-mail aqui) ...</html>"""
+        corpo_email = f"""<html>
+          <body style="font-family: Arial, sans-serif; background: #f3f4f6; padding: 20px;">
+            <div style="max-width: 480px; margin: auto; background: #ffffff; border-radius: 12px; padding: 30px; text-align: center;">
+              <h2 style="color: #111827;">Redefinição de Senha</h2>
+              <p style="color: #4b5563;">Olá, {func_db.nome}! Foi solicitada a redefinição da sua senha no ERP.</p>
+              <p style="color: #4b5563;">Clique no botão abaixo para criar uma nova senha (o link expira em 1 hora):</p>
+              <a href="{link_seguro}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Criar nova senha</a>
+              <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">Se você não solicitou esta alteração, ignore este e-mail.</p>
+            </div>
+          </body>
+        </html>"""
         background_tasks.add_task(enviar_email_background, func_db.email, "ERP: Redefinição de Senha", corpo_email)
         return {"status": "sucesso"}
     return {"status": "erro", "mensagem": "Funcionário sem e-mail corporativo cadastrado."}
@@ -116,7 +126,17 @@ async def auto_solicitar_reset(usuario_logado: str = Cookie(None), db: Session =
         segredo_unico = settings.SECRET_KEY + func_db.senha_hash 
         token_reset = jwt.encode(token_payload, segredo_unico, algorithm=settings.ALGORITHM)
         link_seguro = f"{settings.URL_BASE}/recuperar-senha?token={token_reset}"
-        corpo_email = f"""<html>... (corpo do e-mail aqui) ...</html>"""
+        corpo_email = f"""<html>
+          <body style="font-family: Arial, sans-serif; background: #f3f4f6; padding: 20px;">
+            <div style="max-width: 480px; margin: auto; background: #ffffff; border-radius: 12px; padding: 30px; text-align: center;">
+              <h2 style="color: #111827;">Redefinição de Senha</h2>
+              <p style="color: #4b5563;">Olá, {func_db.nome}! Foi solicitada a redefinição da sua senha no ERP.</p>
+              <p style="color: #4b5563;">Clique no botão abaixo para criar uma nova senha (o link expira em 1 hora):</p>
+              <a href="{link_seguro}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Criar nova senha</a>
+              <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">Se você não solicitou esta alteração, ignore este e-mail.</p>
+            </div>
+          </body>
+        </html>"""
         background_tasks.add_task(enviar_email_background, func_db.email, "ERP: Redefinição de Senha Solicitada", corpo_email)
         return {"status": "sucesso"}
     return {"status": "erro", "mensagem": "E-mail não configurado."}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Cookie, Form
+from fastapi import APIRouter, Request, Depends, Cookie, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -20,7 +20,9 @@ async def aba_producao(request: Request, usuario_logado: str = Cookie(None), db:
 
 @router.post("/api/producao/avancar-os")
 async def avancar_os_producao(id_os: int = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    username = decodificar_token(usuario_logado)
+    usuario_db = verificar_acesso("producao", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     
     if os_db:

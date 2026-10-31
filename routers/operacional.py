@@ -50,7 +50,8 @@ async def aba_operacional(request: Request, usuario_logado: str = Cookie(None), 
 # NOVA ROTA: CADASTRAR FRESAS
 # =================================================================
 @router.post("/api/operacional/nova-fresa")
-async def criar_fresa(nome: str = Form(...), diametro: float = Form(...), max_stepdown: float = Form(...), db: Session = Depends(get_db)):
+async def criar_fresa(nome: str = Form(...), diametro: float = Form(...), max_stepdown: float = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     nova_fresa = CncFresa(nome=nome.strip(), diametro=diametro, max_stepdown=max_stepdown)
     db.add(nova_fresa)
     db.commit()
@@ -59,7 +60,8 @@ async def criar_fresa(nome: str = Form(...), diametro: float = Form(...), max_st
 # ROTA: EXCLUIR FRESA DA BIBLIOTECA
 # =================================================================
 @router.post("/api/operacional/excluir-fresa")
-async def excluir_fresa(id_fresa: int = Form(...), db: Session = Depends(get_db)):
+async def excluir_fresa(id_fresa: int = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     fresa = db.query(CncFresa).filter(CncFresa.id == id_fresa).first()
     if fresa:
         db.delete(fresa)
@@ -69,7 +71,9 @@ async def excluir_fresa(id_fresa: int = Form(...), db: Session = Depends(get_db)
 # 🔄 ATUALIZAR STATUS DA O.S.
 @router.post("/api/operacional/atualizar-os")
 async def atualizar_os(id_os: int = Form(...), acao: str = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    username = decodificar_token(usuario_logado)
+    usuario_db = verificar_acesso("operacional", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     os_db = db.query(OrdemServico).filter(OrdemServico.id == id_os).first()
     
     if os_db:
@@ -88,7 +92,9 @@ async def atualizar_os(id_os: int = Form(...), acao: str = Form(...), usuario_lo
 # 🚨 BOTÃO DE PÂNICO: AVISAR COMPRAS SOBRE INSUMO 
 @router.post("/api/operacional/alerta-estoque")
 async def alerta_estoque(nome_insumo: str = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
-    username = decodificar_token(usuario_logado)
+    usuario_db = verificar_acesso("operacional", usuario_logado, db)
+    if not usuario_db: raise HTTPException(status_code=403)
+    username = usuario_db.usuario
     db.add(Notificacao(
         remetente=f"{username} (Operacional)", destinatario_setor="administracao", tipo="urgente",
         mensagem=f"🚨 ALERTA DE MÁQUINA: O insumo '{nome_insumo}' está zerado ou em falta na fábrica. Por favor, providenciar compra urgente!",
@@ -99,14 +105,16 @@ async def alerta_estoque(nome_insumo: str = Form(...), usuario_logado: str = Coo
 
 # ➕ ADICIONAR NOVO INSUMO NO ESTOQUE
 @router.post("/api/operacional/novo-insumo")
-async def novo_insumo(nome: str = Form(...), quantidade: float = Form(0), unidade: str = Form("un"), db: Session = Depends(get_db)):
+async def novo_insumo(nome: str = Form(...), quantidade: float = Form(0), unidade: str = Form("un"), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     db.add(ProdutoEstoque(nome=nome.strip(), quantidade=quantidade, unidade=unidade))
     db.commit()
     return RedirectResponse(url="/operacional", status_code=302)
 
 # ➕ ADICIONAR NOVO SERVIÇO AO CATÁLOGO (COMERCIAL)
 @router.post("/api/operacional/novo-servico")
-async def novo_servico(nome: str = Form(...), db: Session = Depends(get_db)):
+async def novo_servico(nome: str = Form(...), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     db.add(CatalogoServico(nome=nome.strip(), setores="operacional", terceirizado=False))
     db.commit()
     return RedirectResponse(url="/operacional", status_code=302)
@@ -139,8 +147,9 @@ def converter_para_mth(texto: str) -> str:
 async def nova_maquina(
     nome: str = Form(...), status: str = Form("Livre"), tamanho_util: str = Form(""),
     materiais_permitidos: str = Form(""), materiais_proibidos: str = Form(""),
-    velocidade_corte: str = Form(""), db: Session = Depends(get_db)
+    velocidade_corte: str = Form(""), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)
 ):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     # Passa o texto pelo Robô antes de salvar no banco
     velocidade_padronizada = converter_para_mth(velocidade_corte.strip())
     
@@ -171,7 +180,8 @@ async def webhook_maquinas(payload: dict = Body(...), db: Session = Depends(get_
 
 # ✋ ROTA MANUAL: PARA A ROUTER DDCS 3.1 OU MÁQUINAS OFFLINE
 @router.post("/api/operacional/atualizar-maquina")
-async def atualizar_maquina_manual(id_maquina: int = Form(...), status: str = Form(...), arquivo: str = Form(""), db: Session = Depends(get_db)):
+async def atualizar_maquina_manual(id_maquina: int = Form(...), status: str = Form(...), arquivo: str = Form(""), usuario_logado: str = Cookie(None), db: Session = Depends(get_db)):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     maquina = db.query(Maquina).filter(Maquina.id == id_maquina).first()
     if maquina:
         maquina.status = status
@@ -184,8 +194,9 @@ async def editar_maquina(
     id_maquina: int = Form(...), nome: str = Form(...), status: str = Form(...),
     tamanho_util: str = Form(""), materiais_permitidos: str = Form(""),
     materiais_proibidos: str = Form(""), velocidade_corte: str = Form(""), 
-    db: Session = Depends(get_db)
+    usuario_logado: str = Cookie(None), db: Session = Depends(get_db)
 ):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     maquina = db.query(Maquina).filter(Maquina.id == id_maquina).first()
     if maquina:
         maquina.nome = nome.strip()
@@ -221,6 +232,7 @@ async def processar_arquivo_cnc(
     usuario_logado: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
+    if not verificar_acesso("operacional", usuario_logado, db): raise HTTPException(status_code=403)
     # 1. Valida se a extensão é permitida
     extensao = arquivo_vetor.filename.split('.')[-1].lower()
     if extensao not in ['dxf', 'svg', 'cdr']:
