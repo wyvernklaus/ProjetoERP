@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+
+{% block title %}Espelho de Ponto - ERP{% endblock %}
+
+{% block content %}
+<style>
+@media print { body, html { background: white !important; color: black !important; } .no-print { display: none !important; } }
+.linha-ajustada { background-color: rgba(59, 130, 246, 0.1) !important; }
+.btn-toggle-falta:active { transform: scale(0.95); }
+</style>
+
+<div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 no-print border-b border-gray-800 pb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-100">⏱️ Auditoria de Ponto</h1>
+        <p class="text-gray-400 mt-1">Mês: <span class="text-green-400 font-mono text-base">{{ nome_arquivo }}</span></p>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="abrirCalendario()" class="bg-yellow-600 text-white font-bold py-2 px-4 rounded text-sm transition hx-boost="true">📅 Calendário</button>
+        <button onclick="exportarTudoExcel()" class="bg-green-600 text-white font-bold py-2 px-4 rounded text-sm transition hx-boost="true">📥 Exportar</button>
+        <a href="/administracao/relatorio-ponto-funcionarios" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm border border-gray-700 transition text-center hx-boost="true">&larr; Voltar</a>
+    </div>
+    <div class="flex gap-2 no-print">
+        <button onclick="disponibilizarPontoParaEquipe()" id="btnDisponibilizar" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded text-sm transition shadow hx-boost="true">
+            📢 Disponibilizar Ponto
+        </button>
+    </div>
+</div>
+
+<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden mb-6 no-print">
+    <table class="w-full text-left border-collapse" id="tabela-ponto-master">
+        <thead>
+            <tr class="bg-gray-900 border-b border-gray-700 text-xs uppercase text-gray-400">
+                <th class="p-4 font-bold">Colaborador</th>
+                <th class="p-4 font-bold text-center">Faltas Reais</th>
+                <th class="p-4 font-bold text-center">Atrasos</th>
+                <th class="p-4 font-bold text-center">Estouros Almoço</th>
+                <th class="p-4 font-bold text-center">Erros Pendentes</th>
+                <th class="p-4 font-bold text-center">Régua Banco de Horas</th>
+                <th class="p-4 font-bold text-center">Ação</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+            {% for colaborador in relatorio %}
+            <tr class="hover:bg-gray-750 transition duration-150 hx-boost="true">
+                <td class="p-4 font-bold text-white text-base">{{ colaborador.nome }}</td>
+                <td class="p-4 text-center text-red-400 font-bold">{% if colaborador.faltas > 0 %}❌ {{ colaborador.faltas }} Falta(s){% else %}<span class="text-gray-500">0</span>{% endif %}</td>
+                <td class="p-4 text-center text-amber-500 font-bold">{% if colaborador.atrasos_entrada > 0 %}⏳ {{ colaborador.atrasos_entrada }}x{% else %}<span class="text-gray-500">0</span>{% endif %}</td>
+                <td class="p-4 text-center text-purple-400 font-bold">{% if colaborador.estouros_almoco > 0 %}🍕 {{ colaborador.estouros_almoco }}x{% else %}<span class="text-gray-500">0</span>{% endif %}</td>
+                <td class="p-4 text-center">
+                    {% if colaborador.dias_erro > 0 %}<button onclick="abrirEspelho('modal-{{ loop.index }}')" class="bg-amber-600 bg-opacity-20 text-amber-400 hover:bg-amber-500 hover:text-white font-bold px-3 py-1.5 rounded text-xs border border-amber-500 border-opacity-30 transition shadow cursor-pointer hx-boost="true">🚨 {{ colaborador.dias_erro }} pendente(s)</button>
+                    {% else %}<span class="text-green-500 font-bold text-xs">✅ Ok</span>{% endif %}
+                </td>
+                <td class="p-4 text-center">
+                    <div class="flex items-center justify-center gap-2">
+                        <span class="text-xs font-mono text-gray-400 w-16 text-right">{{ colaborador.total_horas }}</span>
+                        <div class="w-24 bg-gray-900 rounded-full h-2.5 overflow-hidden border border-gray-700 bg-opacity-70 shadow-inner">
+                            <div class="h-full {% if colaborador.saldo_positivo %}bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]{% else %}bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]{% endif %} transition-all duration-1000 ease-out" style="width: {{ colaborador.percentual_regua | default(0) }}% hx-boost="true"></div>
+                        </div>
+                        <span class="text-xs font-bold w-20 text-left {% if colaborador.saldo_positivo %}text-green-400{% else %}text-red-400{% endif %}">{{ colaborador.saldo_str }}</span>
+                    </div>
+                </td>
+                <td class="p-4 text-center"><button onclick="abrirEspelho('modal-{{ loop.index }}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-xs transition shadow hx-boost="true">🔍 Abrir Cartão</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+ 
+<div id="modalCalendario" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 no-print">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-white">📅 Feriados e Folgas Globais</h3>
+            <button onclick="document.getElementById('modalCalendario').classList.add('hidden')" class="text-gray-400 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        
+        <div class="bg-gray-950 border border-gray-800 p-3 rounded-lg mb-6 text-xs text-gray-300">
+            <strong class="text-white block mb-1">Como usar: Clique nos dias abaixo para alterar o status.</strong>
+            <ul class="space-y-1">
+                <li>👆 <strong>1 Clique:</strong> <span class="text-green-400 font-bold">Feriado</span> (Isenta as horas do dia).</li>
+                <li>✌️ <strong>2 Cliques:</strong> <span class="text-yellow-400 font-bold">Folga Global</span> (Folga de empresa, usa Banco de Horas).</li>
+                <li>🔄 <strong>3 Cliques:</strong> Volta para o dia <span class="text-white font-bold">Normal</span>.</li>
+            </ul>
+        </div>
+        
+        <div class="grid grid-cols-7 gap-2 mb-6 text-center text-xs font-bold text-gray-500">
+            <div>D</div><div>S</div><div>T</div><div>Q</div><div>Q</div><div>S</div><div>S</div>
+        </div>
+        <div class="grid grid-cols-7 gap-2 text-center" id="gridDias">
+            {% for d in lista_dias %}
+                <button type="button" class="btn-dia border border-gray-700 rounded p-2 text-sm font-bold text-gray-300 transition hover:scale-105" data-raw="{{ d.data_raw }}" onclick="toggleDia(this) hx-boost="true">{{ d.dia_num }}</button>
+            {% endfor %}
+        </div>
+        <button onclick="salvarCalendario()" id="btnSalvarCalendario" class="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded transition shadow-lg hx-boost="true">💾 Salvar Calendário</button>
+    </div>
+</div>
+
+{% for colaborador in relatorio %}
+<div id="modalFerias-{{ loop.index }}" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60] p-4 no-print">
+    <div class="bg-gray-900 border border-sky-600 rounded-xl shadow-2xl w-full max-w-sm p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-sky-400">✈️ Programar Férias</h3>
+            <button onclick="document.getElementById('modalFerias-{{ loop.index }}').classList.add('hidden')" class="text-gray-400 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        <p class="text-xs text-gray-300 mb-6">Preencha o período de férias de <strong>{{ colaborador.nome }}</strong>. Isso atualizará o perfil do funcionário e isentará as horas da folha de ponto.</p>
+        
+        <form action="/api/admin/lancar-ferias" method="POST" class="space-y-4">
+            <input type="hidden" name="nome_funcionario" value="{{ colaborador.nome }}">
+            <input type="hidden" name="mes_ano" value="{{ mes_ano }}">
+            
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Início das Férias</label>
+                <input type="date" name="inicio" class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-sky-500 transition hx-boost="true">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Fim das Férias</label>
+                <input type="date" name="fim" class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-sky-500 transition hx-boost="true">
+            </div>
+            
+            <div class="pt-4 border-t border-gray-800 flex justify-between gap-2">
+                <button type="button" onclick="document.getElementById('modalFerias-{{ loop.index }}').classList.add('hidden')" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm w-full">Cancelar</button>
+                <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-4 rounded text-sm w-full shadow-lg">💾 Salvar Férias</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modal-{{ loop.index }}" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 no-print">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+        <div class="p-6 bg-gray-900 border-b border-gray-800 flex justify-between items-center">
+            <div>
+                <h3 class="text-xl font-bold text-white">📋 Folha de Ponto Interativa</h3>
+                <p class="text-sm text-blue-400">Colaborador: <span class="text-white font-bold">{{ colaborador.nome }}</span></p>
+            </div>
+            <div class="flex gap-4 items-center">
+                <button onclick="document.getElementById('modalFerias-{{ loop.index }}').classList.remove('hidden')" class="bg-sky-600 hover:bg-sky-500 text-white font-bold py-1.5 px-4 rounded text-xs transition shadow border border-sky-400 border-opacity-50 hx-boost="true">✈️ Programar Férias</button>
+                <button onclick="fecharEspelho('modal-{{ loop.index }}')" class="text-gray-400 hover:text-white text-3xl font-light focus:outline-none">&times;</button>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-900" id="print-area-{{ loop.index }}">
+            <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4 bg-gray-950 p-4 rounded-lg border border-gray-800 text-white shadow-inner">
+                <div><label class="text-[10px] text-gray-500 font-bold block">Horas Brutas</label><span class="text-base font-mono text-purple-400 font-bold">{{ colaborador.total_bruto }}</span></div>
+                <div><label class="text-[10px] text-gray-500 font-bold block">Horas Líquidas</label><span class="text-base font-mono text-blue-400 font-bold">{{ colaborador.total_horas }}</span></div>
+                <div><label class="text-[10px] text-gray-500 font-bold block">Saldo Geral</label><span class="text-base font-bold {% if colaborador.saldo_positivo %}text-green-400{% else %}text-red-400{% endif %}">{{ colaborador.saldo_str }}</span></div>
+                <div><label class="text-[10px] text-gray-500 font-bold block">Faltas Reais</label><span class="text-base font-bold text-red-500">{{ colaborador.faltas }}d</span></div>
+                <div><label class="text-[10px] text-gray-500 font-bold block">Atrasos</label><span class="text-base font-bold text-amber-500">{{ colaborador.atrasos_entrada }}x</span></div>
+                <div><label class="text-[10px] text-gray-500 font-bold block">Estouros Almoço</label><span class="text-base font-bold text-purple-400">{{ colaborador.estouros_almoco }}x</span></div>
+                <div><label class="text-[10px] text-gray-500 font-bold block">Erros Restantes</label>
+                    <span class="text-base font-bold {% if colaborador.dias_erro > 0 %}text-amber-500{% else %}text-green-500{% endif %}">
+                        {% if colaborador.dias_erro > 0 %}{{ colaborador.dias_erro }}d{% else %}✅ Ok{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <div class="border border-gray-800 rounded-lg overflow-hidden bg-gray-950 text-white shadow-lg">
+                <div class="grid grid-cols-12 bg-gray-900 p-3 text-[10px] uppercase font-bold text-gray-400 border-b border-gray-800 text-center items-center tracking-wider">
+                    <div class="col-span-3 text-left">Data</div>
+                    <div class="col-span-4">Batidas (HH:MM)</div>
+                    <div class="col-span-2">Bruto / Líquido</div>
+                    <div class="col-span-1">Banco Dia</div>
+                    <div class="col-span-2 text-right">Ação</div>
+                </div>
+
+                <div class="divide-y divide-gray-800" id="lista-dias-{{ loop.index }}">
+                    {% for dia in colaborador.detalhes_dias %}
+                    <div class="grid grid-cols-12 p-2 items-center text-center transition-colors duration-300 {% if dia.falta %}bg-red-900 bg-opacity-30{% elif dia.inconsistente %}bg-amber-950 bg-opacity-20{% elif dia.tipo_dia == 'Feriado' %}bg-green-900 bg-opacity-20{% elif dia.tipo_dia == 'Folga' %}bg-yellow-900 bg-opacity-20{% elif dia.ajustado %}linha-ajustada{% endif %}"data-raw="{{ dia.data_raw }} hx-boost="true"> 
+                        <div class="col-span-3 text-left font-medium text-gray-300 flex flex-col items-start gap-1">
+                            <span class="text-xs">{{ dia.data }}</span>
+                            
+                            {% if dia.falta %}<button onclick="alternarFolga('{{ colaborador.nome }}', '{{ dia.data_raw }}', this)" class="btn-toggle-falta bg-red-600 hover:bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide transition shadow cursor-pointer text-left" title="Transformar em Folga hx-boost="true">❌ Falta</button>{% endif %}
+                            
+                            {% if dia.tipo_dia == "Férias" %}<span class="bg-sky-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">✈️ Férias</span>{% endif %}
+                            
+                            {% if dia.tipo_dia == "Feriado" %}<span class="bg-green-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">🌴 Feriado</span>{% endif %}
+                            {% if dia.tipo_dia == "Folga" %}<span class="bg-yellow-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">🛋️ Folga Global</span>{% endif %}
+                            {% if dia.tipo_dia == "Fim de Semana" %}<span class="bg-gray-600 text-gray-300 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">🛋️ DSR</span>{% endif %}
+                            {% if dia.tipo_dia == "Folga Banco" %}<button onclick="alternarFolga('{{ colaborador.nome }}', '{{ dia.data_raw }}', this)" class="btn-toggle-falta bg-indigo-600 hover:bg-indigo-500 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide transition shadow cursor-pointer text-left" title="Remover folga e voltar para Falta hx-boost="true">🛋️ Folga Banco (-8h50)</button>{% endif %}
+                            {% if dia.ajustado %}<span class="bg-blue-600 bg-opacity-30 text-blue-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">✍️ Ajustado</span>{% endif %}
+                            {% if dia.auto_almoco %}<span class="tag-auto bg-purple-600 bg-opacity-30 text-purple-400 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">🤖 Auto 1h</span>{% endif %}
+                            {% if dia.aprovado %}<span class="tag-aprovado-dinamica bg-green-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">✅ Aprovado</span>{% endif %}
+                        </div>
+                        
+                        <div class="col-span-4 flex gap-1 justify-center items-center">
+                            <input type="text" value="{{ dia.batidas[0] if dia.batidas|length > 0 else '' }}" placeholder="--" class="w-11 text-center bg-gray-900 border border-gray-700 rounded p-1 text-xs text-green-400 font-bold font-mono outline-none focus:border-blue-500" data-b1 oninput="formatarHora(this)" maxlength="5">
+                            <input type="text" value="{{ dia.batidas[1] if dia.batidas|length > 1 else '' }}" placeholder="--" class="w-11 text-center bg-gray-900 border border-gray-700 rounded p-1 text-xs text-green-400 font-bold font-mono outline-none focus:border-blue-500" data-b2 oninput="formatarHora(this)" maxlength="5">
+                            <input type="text" value="{{ dia.batidas[2] if dia.batidas|length > 2 else '' }}" placeholder="--" class="w-11 text-center bg-gray-900 border border-gray-700 rounded p-1 text-xs text-green-400 font-bold font-mono outline-none focus:border-blue-500" data-b3 oninput="formatarHora(this)" maxlength="5">
+                            <input type="text" value="{{ dia.batidas[3] if dia.batidas|length > 3 else '' }}" placeholder="--" class="w-11 text-center bg-gray-900 border border-gray-700 rounded p-1 text-xs text-green-400 font-bold font-mono outline-none focus:border-blue-500" data-b4 oninput="formatarHora(this)" maxlength="5">
+                        </div>
+                        
+                        <div class="col-span-2 flex flex-col justify-center gap-1">
+                            <span class="text-[11px] font-mono text-purple-400 font-bold bruto-dia" title="Horas Brutas na Empresa">{{ dia.bruto_dia }}</span>
+                            <span class="text-[11px] font-mono text-blue-400 font-bold liquido-dia" title="Horas Líquidas Trabalhadas">{{ dia.total_dia }}</span>
+                        </div>
+
+                        <div class="col-span-1 text-[11px] font-mono font-bold saldo-dia {% if dia.saldo_dia_positivo %}text-green-400{% else %}text-red-500{% endif %}">
+                            {% if dia.tipo_dia == 'Folga Banco' and dia.batidas|length == 0 %}<span class="text-red-500">-8h 50m</span>{% else %}{{ dia.saldo_dia_str }}{% endif %}
+                        </div>
+                        
+                        <div class="col-span-2 text-right flex flex-col items-end gap-1">
+                            {% if dia.tem_erro_original %}
+                            <button onclick="aprovarDia('{{ colaborador.nome }}', '{{ dia.data_raw }}', this)" class="{% if dia.aprovado %}bg-green-600 hover:bg-green-500{% else %}bg-amber-600 hover:bg-amber-500{% endif %} text-white font-bold py-1 px-2 rounded text-[9px] transition shadow w-full hx-boost="true">
+                                {% if dia.aprovado %}↩️ Desfazer OK{% else %}👍 Aprovar Erro{% endif %}
+                            </button>
+                            {% endif %}
+                            
+                            <button onclick="pedirExplicacao('{{ colaborador.nome }}', '{{ dia.data_raw }}')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 px-2 rounded text-[9px] uppercase transition shadow w-full" title="Enviar notificação cobrando explicação hx-boost="true">
+                                ❓ Explicar
+                            </button>
+                        </div>
+
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-gray-950 border-t border-gray-800 flex justify-between items-center">
+            <button onclick="imprimirEspelho('print-area-{{ loop.index }}', '{{ colaborador.nome }}')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded text-sm transition shadow hx-boost="true">🖨️ Imprimir PDF Oficial</button>
+            <div class="flex gap-2">
+                <button onclick="salvarCartaoMassa('{{ colaborador.nome }}', '{{ loop.index }}', this)" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded text-sm transition shadow hx-boost="true">💾 Salvar Alterações</button>
+                <button onclick="fecharEspelho('modal-{{ loop.index }}')" class="bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded text-sm transition hx-boost="true">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+let stateCalendario = {{ config_cal | safe if config_cal else '{}' }};
+
+function abrirEspelho(idModal) { document.getElementById(idModal).classList.remove('hidden'); document.body.classList.add('overflow-hidden'); }
+function fecharEspelho(idModal) { document.getElementById(idModal).classList.add('hidden'); document.body.classList.remove('overflow-hidden'); }
+
+function abrirCalendario() {
+    document.getElementById('modalCalendario').classList.remove('hidden');
+    document.querySelectorAll('.btn-dia').forEach(btn => {
+        let raw = btn.getAttribute('data-raw');
+        aplicarCorDia(btn, stateCalendario[raw] || "Normal");
+    });
+}
+function toggleDia(btn) {
+    let raw = btn.getAttribute('data-raw'); let atual = stateCalendario[raw] || "Normal";
+    let proximo = atual === "Normal" ? "Feriado" : (atual === "Feriado" ? "Folga" : "Normal");
+    if (proximo === "Normal") delete stateCalendario[raw]; else stateCalendario[raw] = proximo;
+    aplicarCorDia(btn, proximo);
+}
+function aplicarCorDia(btn, tipo) {
+    btn.className = "btn-dia border border-gray-700 rounded p-2 text-sm font-bold transition hover:scale-105  hx-boost="true";
+    if (tipo === "Feriado") btn.classList.add("bg-green-600", "text-white");
+    else if (tipo === "Folga") btn.classList.add("bg-yellow-600", "text-white");
+    else btn.classList.add("bg-gray-800", "text-gray-300");
+}
+async function salvarCalendario() {
+    const btn = document.getElementById('btnSalvarCalendario'); btn.innerText = "⏳ Recalculando...";
+    try {
+        const res = await fetch("/api/admin/atualizar-calendario", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ mes_ano: "{{ mes_ano }}", calendario: stateCalendario }) });
+        if(res.ok) { window.location.reload(); }
+    } catch(e) { btn.innerText = "Erro!"; }
+}
+
+async function alternarFolga(nomeFunc, dataRaw, botao) {
+    botao.innerText = "⏳...";
+    const fd = new FormData(); fd.append("nome_funcionario", nomeFunc); fd.append("data_raw", dataRaw); fd.append("mes_ano", "{{ mes_ano }}");
+    try { const res = await fetch("/api/admin/alternar-folga", { method: "POST", body: fd }); if (res.ok) { window.location.reload(); } } catch(e) {}
+}
+
+async function aprovarDia(nomeFunc, dataRaw, botao) {
+    const textoOriginal = botao.innerText;
+    botao.innerText = "⏳...";
+    const fd = new FormData(); fd.append("nome_funcionario", nomeFunc); fd.append("data_raw", dataRaw); fd.append("mes_ano", "{{ mes_ano }}");
+    
+    try { 
+        const resposta = await fetch("/api/admin/aprovar-dia", { method: "POST", body: fd }); 
+        if (resposta.ok) {
+            const linhaGrid = botao.closest('.grid'); 
+            const colunaTags = linhaGrid.firstElementChild; 
+            
+            if (textoOriginal.includes("Desfazer")) {
+                botao.innerText = "👍 Aprovar Erro";
+                botao.className = "bg-amber-600 hover:bg-amber-500 text-white font-bold py-1 px-2 rounded text-[9px] transition shadow w-full hx-boost="true";
+                const tagAprovado = colunaTags.querySelector('.tag-aprovado-dinamica');
+                if (tagAprovado) tagAprovado.remove();
+            } else {
+                botao.innerText = "↩️ Desfazer OK";
+                botao.className = "bg-green-600 hover:bg-green-500 text-white font-bold py-1 px-2 rounded text-[9px] transition shadow w-full hx-boost="true";
+                if (!colunaTags.querySelector('.tag-aprovado-dinamica')) {
+                    colunaTags.insertAdjacentHTML('beforeend', '<span class="tag-aprovado-dinamica bg-green-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">✅ Aprovado</span>');
+                }
+            }
+        } 
+    } catch(e) { botao.innerText = textoOriginal; alert("Erro ao processar aprovação."); }
+}
+
+async function salvarCartaoMassa(nomeFunc, indexColab, botao) {
+    botao.innerText = "Salvando...";
+    const container = document.getElementById(`lista-dias-${indexColab}`);
+    const linhas = container.querySelectorAll('.grid[data-raw]');
+    let dias = [];
+    
+    linhas.forEach(l => {
+        const ins = l.querySelectorAll('input');
+        dias.push({
+            data_raw: l.dataset.raw,
+            b1: ins[0].value, b2: ins[1].value, b3: ins[2].value, b4: ins[3].value
+        });
+    });
+
+    const res = await fetch("/api/admin/corrigir-ponto-massa", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ nome_funcionario: nomeFunc, mes_ano: "{{ mes_ano }}", dias: dias })
+    });
+    
+    if(res.ok) {
+        botao.innerText = "💾 Salvo!";
+        setTimeout(() => { botao.innerText = "💾 Salvar Alterações"; window.location.reload(); }, 600);
+    }
+}
+
+function formatarHora(input) {
+    let v = input.value.replace(/\D/g, '');
+    if (v.length > 2) { v = v.slice(0, 2) + ':' + v.slice(2, 4); }
+    input.value = v;
+}
+
+function imprimirEspelho(areaId, nomeFunc) {
+    const printArea = document.getElementById(areaId);
+    const linhasDias = printArea.querySelectorAll('.grid[data-raw]');
+    
+    const janelaPrint = window.open('', '', 'width=900,height=800');
+    janelaPrint.document.write(`
+        <html>
+        <head>
+            <title>Espelho de Ponto Oficial</title>
+            <style>
+                body { font-family: sans-serif; color: #000 !important; background: #fff !important; padding: 40px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+                th, td { border: 1px solid #000; padding: 10px; text-align: center; color: #000 !important; font-size: 12px; }
+                th { background: #f2f2f2; font-size: 11px; text-transform: uppercase; font-weight: bold; }
+                .header-box { border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 25px; }
+                .signature { margin-top: 80px; text-align: center; font-size: 12px; color: #000 !important; }
+            </style>
+        </head>
+        <body>
+            <div class="header-box">
+                <h2 style="margin:0; color:#000; font-size: 20px;">RELATÓRIO MENSAL DE FREQUÊNCIA INDIVIDUAL</h2>
+                <p style="margin:6px 0 0 0; font-size:14px; color:#000;">Colaborador: <strong>${nomeFunc}</strong> | Carga Diária CLT: 08h 48m</p>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Entrada</th>
+                        <th>Almoço</th>
+                        <th>Retorno</th>
+                        <th>Saída</th>
+                        <th>Líquido</th>
+                        <th>Banco Dia</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `);
+
+    linhasDias.forEach(linha => {
+        const textoData = linha.firstElementChild.firstElementChild ? linha.firstElementChild.firstElementChild.innerText.trim() : linha.firstElementChild.innerText.trim();
+        
+        const inputsPonto = linha.querySelectorAll('input[type="text"]');
+        const b1 = inputsPonto[0] ? inputsPonto[0].value.trim() || '--' : '--';
+        const b2 = inputsPonto[1] ? inputsPonto[1].value.trim() || '--' : '--';
+        const b3 = inputsPonto[2] ? inputsPonto[2].value.trim() || '--' : '--';
+        const b4 = inputsPonto[3] ? inputsPonto[3].value.trim() || '--' : '--';
+        
+        const campoLiquido = linha.querySelector('.liquido-dia');
+        const campoSaldo = linha.querySelector('.saldo-dia');
+        
+        const liquidoTxt = campoLiquido ? campoLiquido.innerText.trim() : '--';
+        const saldoTxt = campoSaldo ? campoSaldo.innerText.trim() : '--';
+        
+        if (b1 === '--' && b2 === '--' && b3 === '--' && b4 === '--') {
+            let motivo = "SEM REGISTRO";
+            const htmlConteudo = linha.innerHTML;
+            
+            if (htmlConteudo.includes("Férias")) {
+                motivo = "FÉRIAS REGULAMENTARES";
+            } else if (htmlConteudo.includes("Feriado")) {
+                motivo = "FERIADO MUNICIPAL / NACIONAL";
+            } else if (htmlConteudo.includes("Folga Global")) {
+                motivo = "FOLGA GERAL CONCEDIDA";
+            } else if (htmlConteudo.includes("Folga Banco")) {
+                motivo = "FOLGA COMPENSATÓRIA (BANCO DE HORAS)";
+            } else if (htmlConteudo.includes("DSR")) {
+                motivo = "DESCANSO SEMANAL REMUNERADO (DSR)";
+            } else if (htmlConteudo.includes("Falta")) {
+                motivo = "FALTA NÃO JUSTIFICADA";
+            }
+            
+            janelaPrint.document.write(`
+                <tr>
+                    <td><strong>${textoData}</strong></td>
+                    <td colspan="4" style="color: #222 !important; font-style: italic; background-color: #f9f9f9; font-weight: bold; letter-spacing: 0.5px;">${motivo}</td>
+                    <td>${liquidoTxt}</td>
+                    <td style="font-weight: bold;">${saldoTxt}</td>
+                </tr>
+            `);
+        } else {
+            janelaPrint.document.write(`
+                <tr>
+                    <td><strong>${textoData}</strong></td>
+                    <td>${b1}</td>
+                    <td>${b2}</td>
+                    <td>${b3}</td>
+                    <td>${b4}</td>
+                    <td>${liquidoTxt}</td>
+                    <td style="font-weight: bold;">${saldoTxt}</td>
+                </tr>
+            `);
+        }
+    });
+
+    janelaPrint.document.write(`
+                </tbody>
+            </table>
+            <div class="signature">
+                <p>________________________________________________________</p>
+                <p style="margin-top:5px; font-size:11px; letter-spacing:1px; font-weight: bold;">ASSINATURA DO COLABORADOR</p>
+            </div>
+        </body>
+        </html>
+    `);
+    
+    janelaPrint.document.close();
+    setTimeout(() => { janelaPrint.print(); janelaPrint.close(); }, 400);
+}
+
+function exportarTudoExcel() {
+    let csv = ["\ufeffColaborador;Faltas;Atrasos;Estouros Almoço;Erros;Total Horas;Saldo"];
+    document.querySelectorAll("#tabela-ponto-master tbody tr").forEach(linha => {
+        const colunas = linha.querySelectorAll("td");
+        if(colunas.length > 0) {
+            const nome = colunas[0].innerText.trim(); const faltas = colunas[1].innerText.trim();
+            const atrasos = colunas[2].innerText.trim(); const almoco = colunas[3].innerText.trim(); const erros = colunas[4].innerText.trim();
+            const reguaTexto = colunas[5].innerText.trim().split("\n"); const totalH = reguaTexto[0] || "--"; const saldoH = reguaTexto[reguaTexto.length - 1] || "--";
+            csv.push(`${nome};${faltas};${atrasos};${almoco};${erros};${totalH};${saldoH}`);
+        }
+    });
+    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" })); link.setAttribute("download", "Relatorio_Ponto.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+}
+
+// --- ENVIAR DÚVIDA DE PONTO PARA O FUNCIONÁRIO ---
+async function pedirExplicacao(nomeFuncionario, dataRaw) {
+    const duvida = prompt(`O que você deseja perguntar para ${nomeFuncionario} sobre o dia ${dataRaw}?\n\n(Ex: Você esqueceu de bater a volta do almoço?)`);
+    
+    // Se o RH cancelar ou deixar em branco, não faz nada
+    if (!duvida || duvida.trim() === "") return; 
+
+    const fd = new FormData();
+    fd.append("nome_funcionario", nomeFuncionario);
+    fd.append("data_raw", dataRaw);
+    fd.append("mensagem", duvida);
+
+    try {
+        const response = await fetch('/api/admin/pedir-explicacao', { method: 'POST', body: fd });
+        const dados = await response.json();
+        
+        if (dados.status === "sucesso") {
+            alert("✅ Notificação enviada! O funcionário verá no painel dele.");
+        } else {
+            alert("❌ Erro: " + dados.mensagem);
+        }
+    } catch (error) {
+        alert("Erro de comunicação com o servidor.");
+    }
+}
+// --- ENVIAR DÚVIDA DE PONTO PARA O FUNCIONÁRIO ---
+async function pedirExplicacao(nomeFunc, dataRaw) {
+    const duvida = prompt(`O que você deseja perguntar para ${nomeFunc} sobre o dia ${dataRaw}?\n\n(Ex: Esqueceu de bater a volta do almoço?)`);
+    
+    // Se o RH cancelar ou deixar em branco, não faz nada
+    if (!duvida || duvida.trim() === "") return; 
+
+    const fd = new FormData();
+    fd.append("nome_funcionario", nomeFunc);
+    fd.append("data_raw", dataRaw);
+    fd.append("mensagem", duvida);
+
+    try {
+        const response = await fetch('/api/admin/pedir-explicacao', { method: 'POST', body: fd });
+        const dados = await response.json();
+        
+        if (dados.status === "sucesso") {
+            alert("✅ Notificação enviada com sucesso! O funcionário verá no painel dele.");
+        } else {
+            alert("❌ Erro: " + dados.mensagem);
+        }
+    } catch (error) {
+        alert("Erro de comunicação com o servidor.");
+    }
+}
+// --- RH: LIBERAR E DISPONIBILIZAR O PONTO DO MÊS PARA A EQUIPE ---
+async function disponibilizarPontoParaEquipe() {
+    if(!confirm("Deseja homologar e disponibilizar este relatório de ponto para consulta de todos os colaboradores? Isso enviará um alerta no painel deles.")) return;
+    
+    const btn = document.getElementById('btnDisponibilizar');
+    btn.innerText = "⏳ Notificando equipe...";
+    btn.disabled = true;
+    
+    const fd = new FormData();
+    fd.append("mes_ano", "{{ mes_ano }}"); // Pega o mês ativo automaticamente
+    
+    try {
+        const res = await fetch("/api/admin/disponibilizar-folha", { method: "POST", body: fd });
+        const dados = await res.json();
+        if(dados.status === "sucesso") {
+            alert("📢 Sucesso! O ponto foi disponibilizado e toda a equipe recebeu um alerta no sininho.");
+            btn.innerText = "✅ Ponto Disponibilizado";
+        } else {
+            alert("Erro: " + dados.mensagem);
+            btn.innerText = "📢 Disponibilizar Ponto";
+            btn.disabled = false;
+        }
+    } catch(e) {
+        alert("Erro na comunicação.");
+        btn.innerText = "📢 Disponibilizar Ponto";
+        btn.disabled = false;
+    }
+}
+// Função para o RH abrir o modal de auditoria
+function abrirModalAuditoria(idJust, usuario, data, horariosJson, motivo) {
+    const h = JSON.parse(horariosJson);
+    document.getElementById('conteudo-auditoria').innerHTML = `
+        <div class="bg-gray-800 p-4 rounded border border-gray-600 mb-4">
+            <p class="text-xs text-gray-400 uppercase">Funcionário: <strong>${usuario}</strong></p>
+            <p class="text-xs text-gray-400 uppercase">Data: <strong>${data}</strong></p>
+            <p class="text-sm text-gray-200 mt-2 italic">"${motivo}"</p>
+        </div>
+        <div class="grid grid-cols-4 gap-2 mb-4">
+            <div class="bg-black p-2 rounded text-center"><p class="text-[9px] text-gray-500">ENT</p><p class="text-xs">${h.b1}</p></div>
+            <div class="bg-black p-2 rounded text-center"><p class="text-[9px] text-gray-500">ALM</p><p class="text-xs">${h.b2}</p></div>
+            <div class="bg-black p-2 rounded text-center"><p class="text-[9px] text-gray-500">RET</p><p class="text-xs">${h.b3}</p></div>
+            <div class="bg-black p-2 rounded text-center"><p class="text-[9px] text-gray-500">SAI</p><p class="text-xs">${h.b4}</p></div>
+        </div>
+        <button onclick="confirmarAprovacao(${idJust})" class="w-full bg-green-600 text-white font-bold py-2 rounded">✅ Computar no Ponto</button>
+    `;
+    document.getElementById('modalAuditoria').classList.remove('hidden');
+}
+
+async function confirmarAprovacao(id) {
+    const fd = new FormData(); fd.append("id_justificativa", id);
+    const res = await fetch("/api/admin/aprovar-justificativa", { method: "POST", body: fd });
+    if((await res.json()).status === "sucesso") {
+        alert("Ponto computado e auditoria finalizada!");
+        window.location.reload();
+    }
+}
+</script>
+{% endblock %}

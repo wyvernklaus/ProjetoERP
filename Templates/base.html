@@ -1,0 +1,415 @@
+{% from "macros/icons.html" import icon %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>{% block title %}Gestão ERP{% endblock %}</title>
+
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+    <meta http-equiv="Cache-Control" content="public, max-age=86400">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide no HEAD para garantir que ele sobreviva às trocas de tela -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#111827">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2942/2942813.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        #barra-carregamento {
+            position: fixed; top: 0; left: 0; height: 3px; background: #3b82f6; z-index: 9999;
+            transition: width 0.2s, opacity 0.4s; width: 0%; opacity: 0;
+        }
+        /* Suaviza a troca de páginas do HTMX */
+        .htmx-swapping #conteudo-principal {
+            opacity: 0;
+            transition: opacity 100ms ease-out;
+        }
+        #conteudo-principal {
+            opacity: 1;
+            transition: opacity 150ms ease-in;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-[100dvh] flex overflow-hidden font-sans w-full" hx-boost="true" hx-target="#conteudo-principal" hx-select="#conteudo-principal" hx-swap="outerHTML transition:true show:window:top">
+
+    <div id="barra-carregamento"></div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-60 z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
+
+    <aside id="sidebar" class="fixed md:relative inset-y-0 left-0 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-black border-r border-gray-800 flex flex-col z-50 h-full">
+        <div class="p-6 flex justify-between items-center border-b border-gray-800 md:border-none">
+            <div>
+                <h2 class="text-2xl font-bold text-blue-500">Gestão ERP</h2>
+                <p class="text-sm text-gray-400 mt-1">{{ usuario.cargo if usuario else '' }}</p>
+            </div>
+            <button onclick="toggleSidebar()" class="md:hidden text-gray-400 hover:text-white text-3xl">&times;</button>
+        </div>
+
+        <nav id="menu-lateral" class="flex-1 px-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
+            {% set rota = request.url.path %}
+
+            <a href="/resumo-diario" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota == '/resumo-diario' else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('sun', '18') }} Resumo do Dia
+            </a>
+
+            <a href="/comercial" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/comercial') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('dollar-sign', '18') }} Comercial
+            </a>
+
+            <a href="/producao" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/producao') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('factory', '18') }} Produção
+            </a>
+
+            <a href="/operacional" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/operacional') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('settings', '18') }} Operacional
+            </a>
+
+            <a href="/administracao" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/administracao') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('bar-chart-2', '18') }} Administração
+            </a>
+
+            {% if usuario and usuario.abas_permitidas and ('manutencao_ti' in usuario.abas_permitidas or 'ti' in usuario.abas_permitidas) %}
+            <a href="/ti" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/ti') else 'border-transparent text-purple-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('monitor', '18') }} Manutenção / TI
+            </a>
+            {% endif %}
+
+            {% if usuario and usuario.abas_permitidas and 'gerencia' in usuario.abas_permitidas %}
+            <a href="/gerencia" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/gerencia') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('crown', '18') }} Gerência
+            </a>
+            {% endif %}
+
+            <a href="/instalacao" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/instalacao') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('truck', '18') }} Instalação (Rua)
+            </a>
+
+            <a href="/info" class="flex items-center gap-3 py-3 px-4 rounded-lg border transition {{ 'bg-gray-800 border-gray-600 text-blue-400 font-black shadow-[0_0_15px_rgba(59,130,246,0.3)]' if rota.startswith('/info') else 'border-transparent text-gray-400 hover:bg-gray-800 hover:text-white' }}">
+                {{ icon('info', '18') }} Minhas Info
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-gray-800 bg-black">
+            <a href="/logout" hx-boost="false" class="flex items-center justify-center gap-2 w-full text-center py-2 bg-red-600 hover:bg-red-700 rounded text-white font-bold transition uppercase text-xs tracking-widest">
+                {{ icon('log-out', '14') }} Sair (Logout)
+            </a>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+        
+        <header class="bg-gray-900 border-b border-gray-800 p-4 flex justify-between items-center z-30 shadow-md">
+            <div class="flex items-center gap-4">
+                <button onclick="toggleSidebar()" class="md:hidden text-white focus:outline-none p-1">
+                    {{ icon('menu', '24') }}
+                </button>
+                <h2 class="text-xl font-bold text-blue-500 md:hidden">Gestão ERP</h2>
+                <h2 class="text-xl font-bold text-gray-300 hidden md:block">Olá, {{ usuario.nome.split()[0] if usuario else 'Colaborador' }}!</h2>
+            </div>
+            
+            <div class="relative">
+                <button onclick="toggleNotificacoes()" class="text-gray-400 hover:text-white relative focus:outline-none transition p-2 bg-gray-800 rounded-full hover:bg-gray-700">
+                    {{ icon('bell', '20') }}
+                    <span id="badge-notificacao" class="hidden absolute top-0 right-0 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full transform translate-x-1/4 -translate-y-1/4 shadow">0</span>
+                </button>
+                
+                <div id="dropdown-notificacoes" class="hidden absolute right-0 mt-3 w-72 sm:w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden">
+                    <div class="p-3 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
+                        <h3 class="text-sm font-bold text-white">Central de Avisos</h3>
+                    </div>
+                    <div id="lista-notificacoes" class="max-h-72 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main id="conteudo-principal" class="flex-1 p-4 md:p-8 overflow-y-auto bg-gray-900 custom-scrollbar w-full relative transition-opacity duration-200">
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+    
+    <div id="modalAlertaUrgente" class="hidden fixed inset-0 bg-red-950 bg-opacity-95 z-[100] flex items-center justify-center p-4">
+        <div class="bg-gray-900 border-4 border-red-600 rounded-3xl shadow-2xl w-full max-w-lg p-8 text-center">
+            <div class="flex justify-center mb-4 animate-bounce text-red-500">
+                {{ icon('alert-triangle', '64') }}
+            </div>
+            <h2 class="text-3xl font-black text-red-500 mb-2 uppercase tracking-widest">Atenção Urgente</h2>
+            <p class="text-gray-400 text-xs mb-6 uppercase font-bold tracking-widest" id="remetenteUrgente">Enviado por: ---</p>
+
+            <div class="bg-black border border-red-900 p-6 rounded-xl mb-8 shadow-inner">
+                <p class="text-xl text-white font-medium leading-relaxed" id="mensagemUrgente">---</p>
+            </div>
+
+            <p class="text-[11px] text-gray-500 mb-4 font-bold uppercase">Sua tela foi bloqueada. Confirme o recebimento para continuar trabalhando.</p>
+
+            <button id="btnConfirmaUrgente" onclick="confirmarLeituraUrgente()" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl text-lg uppercase tracking-widest transition shadow-[0_0_20px_rgba(220,38,38,0.5)]">
+                <span id="txt-btn-urgente">Confirmo que li e entendi</span>
+            </button>
+        </div>
+    </div> 
+
+    <script>
+        // =====================================
+        // 1. PWA E HTMX SETUP
+        // =====================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/static/sw_erp.js'); });
+        }
+
+        // Avisa o Lucide para desenhar os ícones na primeira carga
+        document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+
+        // Avisa o Lucide para desenhar os ícones SEMPRE que o HTMX trocar a página principal
+        document.body.addEventListener('htmx:afterSwap', function() {
+            lucide.createIcons();
+        });
+
+        // Mantém a barra de carregamento funcionando
+        document.body.addEventListener('htmx:beforeRequest', function() {
+            const bar = document.getElementById('barra-carregamento');
+            bar.style.opacity = '1';
+            bar.style.width = '30%';
+        });
+
+        document.body.addEventListener('htmx:afterOnLoad', function() {
+            const bar = document.getElementById('barra-carregamento');
+            bar.style.width = '100%';
+            setTimeout(() => { 
+                bar.style.opacity = '0'; 
+                setTimeout(() => { bar.style.width = '0%'; }, 300); 
+            }, 200);
+        });
+
+        // =====================================
+        // 2. MENU ATIVO (AURA AZUL)
+        // =====================================
+        function atualizarMenuAtivo() {
+            const currentPath = window.location.pathname;
+            const links = document.querySelectorAll('#menu-lateral a');
+
+            links.forEach(link => {
+                const href = link.getAttribute('href');
+                
+                // Apaga a Aura
+                link.classList.remove('bg-gray-800', 'border-gray-600', 'text-blue-400', 'font-black', 'shadow-[0_0_15px_rgba(59,130,246,0.3)]');
+                link.classList.add('border-transparent', 'text-gray-400');
+                
+                // Acende a Aura se for a aba atual
+                if (currentPath === href || (href.length > 1 && currentPath.startsWith(href))) {
+                    link.classList.remove('border-transparent', 'text-gray-400');
+                    link.classList.add('bg-gray-800', 'border-gray-600', 'text-blue-400', 'font-black', 'shadow-[0_0_15px_rgba(59,130,246,0.3)]');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', atualizarMenuAtivo);
+        // Atualiza o menu quando o HTMX troca a página
+        document.body.addEventListener('htmx:afterSettle', atualizarMenuAtivo);    
+
+        // =====================================
+        // 3. SISTEMA DE NOTIFICAÇÕES GLOBAIS
+        // =====================================
+        let alertaUrgenteAberto = false;
+        let idNotificacaoUrgenteAtiva = null;
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('sidebar-overlay').classList.toggle('hidden');
+        }
+
+        function toggleNotificacoes() {
+            document.getElementById('dropdown-notificacoes').classList.toggle('hidden');
+        }
+
+        async function buscarNotificacoes() {
+            try {
+                const response = await fetch('/api/notificacoes');
+                const dados = await response.json();
+                const badge = document.getElementById('badge-notificacao');
+                const lista = document.getElementById('lista-notificacoes');
+                lista.innerHTML = '';
+                
+                if (dados.notificacoes && dados.notificacoes.length > 0) {
+                    const naoLidas = dados.notificacoes.filter(n => !n.lida);
+                    const lidas = dados.notificacoes.filter(n => n.lida);
+                    
+                    if(naoLidas.length > 0) { badge.innerText = naoLidas.length; badge.classList.remove('hidden'); }
+                    else { badge.classList.add('hidden'); }
+
+                    // TRAVA DE URGÊNCIA MÁXIMA
+                    const urgenteNaoLida = naoLidas.find(n => n.tipo === 'urgente');
+                    if (urgenteNaoLida && !alertaUrgenteAberto) {
+                        alertaUrgenteAberto = true;
+                        idNotificacaoUrgenteAtiva = urgenteNaoLida.id;
+                        document.getElementById('remetenteUrgente').innerText = `Enviado por: ${urgenteNaoLida.remetente}`;
+                        document.getElementById('mensagemUrgente').innerText = urgenteNaoLida.mensagem;
+                        document.getElementById('modalAlertaUrgente').classList.remove('hidden');
+                    }
+
+                    if(naoLidas.length > 0) {
+                        lista.innerHTML += `<div class="px-2 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide border-b border-gray-700 mb-2 flex items-center gap-1"><i data-lucide="bell" class="w-3 h-3"></i> Requer Atenção</div>`;
+                        naoLidas.forEach(n => lista.innerHTML += renderizarNotificacao(n, true));
+                    }
+                    if(lidas.length > 0) {
+                        lista.innerHTML += `<div class="px-2 py-1 text-[10px] font-bold text-gray-600 uppercase tracking-wide border-b border-gray-800 mt-4 mb-2 flex items-center gap-1"><i data-lucide="archive" class="w-3 h-3"></i> Histórico Visualizado</div>`;
+                        lidas.forEach(n => lista.innerHTML += renderizarNotificacao(n, false));
+                    }
+                    
+                    // Renderiza os ícones que acabaram de ser injetados
+                    lucide.createIcons();
+                } else {
+                    badge.classList.add('hidden');
+                    lista.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">Caixa de entrada vazia.</p>';
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function renderizarNotificacao(n, isNova) {
+            let icone = '<i data-lucide="bell" class="w-5 h-5 text-gray-400"></i>'; 
+            if (n.tipo === 'ponto' || n.tipo === 'explicacao_ponto') icone = '<i data-lucide="clock" class="w-5 h-5 text-blue-400"></i>'; 
+            if (n.tipo === 'acao') icone = '<i data-lucide="file-text" class="w-5 h-5 text-amber-400"></i>';
+            if (n.tipo === 'urgente') icone = '<i data-lucide="alert-triangle" class="w-5 h-5 text-red-500"></i>';
+            
+            const bgClass = isNova ? "bg-gray-800 border-gray-600" : "bg-black border-gray-800 opacity-60";
+            const textClass = isNova ? "text-gray-200" : "text-gray-500";
+            
+            let msgLimpa = n.mensagem; 
+            let dataRaw = "";
+            
+            if(msgLimpa.includes("[DIA_ALVO:")) {
+                const parts = msgLimpa.split("[DIA_ALVO:"); 
+                msgLimpa = parts[0]; 
+                dataRaw = parts[1].replace("]", "").trim();
+            }
+            if(msgLimpa.includes("[DADOS:")) msgLimpa = msgLimpa.split("[DADOS:")[0]; 
+            
+            let botoesHtml = '';
+            if(isNova) {
+                if (n.tipo === 'explicacao_ponto') {
+                    botoesHtml = `<button onclick="abrirModalDevolucaoPonto('${dataRaw}', '${msgLimpa.trim()}', ${n.id})" class="flex items-center justify-center gap-1 bg-amber-600 hover:bg-amber-500 text-white font-bold px-2 py-1 rounded text-[10px] uppercase w-full shadow cursor-pointer"><i data-lucide="edit-3" class="w-3 h-3"></i> Justificar ao RH</button>`;
+                } else if (n.acao_pendente) {
+                    botoesHtml = `
+                        <button onclick="responderSolicitacao(${n.id}, 'aprovada', this)" class="flex items-center justify-center gap-1 bg-green-700 hover:bg-green-600 text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase mr-2 shadow cursor-pointer"><i data-lucide="check" class="w-3 h-3"></i> Aprovar</button>
+                        <button onclick="responderSolicitacao(${n.id}, 'reprovada', this)" class="flex items-center justify-center gap-1 bg-red-700 hover:bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] uppercase shadow cursor-pointer"><i data-lucide="x" class="w-3 h-3"></i> Recusar</button>
+                    `;
+                } else {
+                    botoesHtml = `<button onclick="marcarComoLida(${n.id}, this)" class="flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 text-green-400 border border-gray-600 font-bold px-2 py-0.5 rounded text-[10px] uppercase w-full shadow cursor-pointer"><i data-lucide="check-circle" class="w-3 h-3"></i> Marcar como Lido</button>`;
+                }
+            } else {
+                botoesHtml = `<span class="text-[9px] uppercase font-bold text-gray-600 flex items-center gap-1"><i data-lucide="check-check" class="w-3 h-3"></i> Resolvida</span>`;
+            }
+            
+            return `
+                <div class="p-3 ${bgClass} rounded border hover:border-gray-500 transition mb-2">
+                    <div class="flex items-start gap-3 mb-2">
+                        <div class="pt-0.5 opacity-80">${icone}</div>
+                        <div class="flex-1">
+                            <p class="text-[10px] text-gray-500 uppercase font-bold mb-1">De: ${n.remetente}</p>
+                            <p class="text-xs ${textClass}">${msgLimpa}</p>
+                            ${n.anexo ? `<a href="${n.anexo}" target="_blank" class="inline-flex items-center gap-1 mt-2 text-[10px] bg-blue-900 text-blue-300 px-2 py-1 rounded cursor-pointer"><i data-lucide="paperclip" class="w-3 h-3"></i> Ver Comprovante</a>` : ''}
+                        </div>
+                    </div>
+                    <div class="flex justify-end border-t border-gray-700 pt-2">${botoesHtml}</div>
+                </div>
+            `;
+        }
+
+        async function marcarComoLida(idNotificacao, elementoHtml) {
+            const fd = new FormData(); fd.append("id_notificacao", idNotificacao);
+            try {
+                const res = await fetch("/api/notificacoes/ler", { method: "POST", body: fd });
+                if((await res.json()).status === "sucesso") buscarNotificacoes(); 
+            } catch(e) { console.error("Erro", e); }
+        }
+
+        async function confirmarLeituraUrgente() {
+            if(idNotificacaoUrgenteAtiva) {
+                document.getElementById('txt-btn-urgente').innerText = "Atualizando...";
+                await marcarComoLida(idNotificacaoUrgenteAtiva, null);
+                document.getElementById('modalAlertaUrgente').classList.add('hidden');
+                document.getElementById('txt-btn-urgente').innerText = "Confirmo que li e entendi";
+                alertaUrgenteAberto = false;
+                idNotificacaoUrgenteAtiva = null;
+            }
+        }
+
+        async function responderSolicitacao(idNotificacao, resposta, botao) {
+            botao.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>';
+            lucide.createIcons();
+            const fd = new FormData(); fd.append("id_notificacao", idNotificacao); fd.append("resposta", resposta);
+            try {
+                const res = await fetch("/api/admin/responder-solicitacao", { method: "POST", body: fd });
+                if(res.ok) buscarNotificacoes();
+            } catch(e) { console.error(e); }
+        }
+
+        function abrirModalDevolucaoPonto(dataRaw, msgRH, idNotif) {
+            toggleNotificacoes(); 
+            const p = dataRaw.split('-');
+            const mesAno = `${p[0]}-${p[1]}`; 
+            const dataTexto = `${p[2]}/${p[1]}/${p[0]}`;
+            
+            let modal = document.getElementById('modalRespHR');
+            if(!modal) {
+                document.body.insertAdjacentHTML('beforeend', `<div id="modalRespHR" class="fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center hidden p-4"><div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"><div class="p-4 bg-gray-950 border-b border-gray-800 flex justify-between items-center"><h3 class="text-base font-bold text-amber-500 flex items-center gap-2"><i data-lucide="edit-3" class="w-5 h-5"></i> Revisão de Ponto</h3><button onclick="document.getElementById('modalRespHR').classList.add('hidden')" class="text-gray-400 hover:text-white text-xl font-bold p-1 cursor-pointer">&times;</button></div><div id="conteudo-resp-hr" class="p-6 overflow-y-auto space-y-4"></div></div></div>`);
+                modal = document.getElementById('modalRespHR');
+            }
+            
+            document.getElementById('conteudo-resp-hr').innerHTML = `
+                <div class="bg-amber-900 bg-opacity-20 border border-amber-800 p-3 rounded">
+                    <p class="text-xs text-amber-400 font-bold uppercase mb-1 flex items-center gap-1"><i data-lucide="alert-circle" class="w-4 h-4"></i> Inconsistência do Dia ${dataTexto}</p>
+                    <p class="text-sm text-gray-300 italic">"${msgRH}"</p>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-gray-400 uppercase font-bold mb-2">1. Informe os horários corretos (Se houver):</label>
+                    <div class="grid grid-cols-4 gap-2 mb-4">
+                        <div><label class="text-[9px] text-gray-500 uppercase">Ent.</label><input type="time" id="hr_b1" class="w-full bg-black border border-gray-600 rounded p-1.5 text-white text-xs text-center"></div>
+                        <div><label class="text-[9px] text-gray-500 uppercase">Alm.</label><input type="time" id="hr_b2" class="w-full bg-black border border-gray-600 rounded p-1.5 text-white text-xs text-center"></div>
+                        <div><label class="text-[9px] text-gray-500 uppercase">Ret.</label><input type="time" id="hr_b3" class="w-full bg-black border border-gray-600 rounded p-1.5 text-white text-xs text-center"></div>
+                        <div><label class="text-[9px] text-gray-500 uppercase">Saí.</label><input type="time" id="hr_b4" class="w-full bg-black border border-gray-600 rounded p-1.5 text-white text-xs text-center"></div>
+                    </div>
+                    <label class="block text-[10px] text-gray-400 uppercase font-bold mb-2">2. Escreva sua justificativa ao RH:</label>
+                    <textarea id="hr_motivo" rows="3" class="w-full bg-black border border-gray-600 rounded p-2 text-sm text-white focus:border-amber-500 outline-none" placeholder="Explique o que aconteceu neste dia..."></textarea>
+                </div>
+                <button onclick="confirmarDevolucaoRH('${mesAno}', '${dataRaw}', '${dataTexto}', ${idNotif})" class="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded text-sm transition shadow mt-2">
+                    <i data-lucide="send" class="w-4 h-4"></i> Confirmar e Devolver Revisado
+                </button>
+            `;
+            lucide.createIcons();
+            modal.classList.remove('hidden');
+        }
+
+        async function confirmarDevolucaoRH(mesAno, dataRaw, dataTexto, idNotif) {
+            const m = document.getElementById('hr_motivo').value.trim();
+            if(!m) { alert("Por favor, escreva a sua justificativa."); return; }
+            
+            const fd = new FormData();
+            fd.append("mes_ano", mesAno); fd.append("data_raw", dataRaw); fd.append("data_texto", dataTexto);
+            fd.append("b1", document.getElementById('hr_b1').value); fd.append("b2", document.getElementById('hr_b2').value);
+            fd.append("b3", document.getElementById('hr_b3').value); fd.append("b4", document.getElementById('hr_b4').value);
+            fd.append("motivo", m);
+            
+            try {
+                const res = await fetch('/api/usuarios/justificar-ponto', { method: 'POST', body: fd });
+                if(res.ok) {
+                    marcarComoLida(idNotif, null); 
+                    document.getElementById('modalRespHR').classList.add('hidden');
+                    alert("✅ Resposta enviada! O RH irá avaliar a sua devolutiva.");
+                }
+            } catch(e) { alert("Erro ao enviar resposta."); }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => { 
+            buscarNotificacoes(); 
+            setInterval(buscarNotificacoes, 10000); 
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redefinir Senha - ERP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black h-screen flex items-center justify-center font-sans">
+
+    <div class="bg-gray-900 p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-800">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-600 bg-opacity-20 text-blue-500 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Nova Senha</h2>
+            <p class="text-gray-400 mt-2 text-sm">Crie uma nova senha de acesso para o usuário <strong class="text-blue-400">{{ usuario }}</strong>.</p>
+        </div>
+ 
+        <form action="/api/usuarios/executar-reset" method="POST" id="form-reset" class="space-y-5">
+            <input type="hidden" name="token" value="{{ token }}">
+            
+            <div>
+                <label class="block text-gray-400 text-xs font-bold mb-2 uppercase tracking-wide">Nova Senha</label>
+                <input class="w-full px-4 py-3 rounded-lg bg-gray-950 text-white border border-gray-700 focus:outline-none focus:border-blue-500 transition" 
+                       id="nova_senha" name="nova_senha" type="password" placeholder="Mínimo de 6 caracteres" required minlength="6">
+            </div>
+
+            <div>
+                <label class="block text-gray-400 text-xs font-bold mb-2 uppercase tracking-wide">Confirmar Nova Senha</label>
+                <input class="w-full px-4 py-3 rounded-lg bg-gray-950 text-white border border-gray-700 focus:outline-none focus:border-blue-500 transition" 
+                       id="confirma_senha" type="password" placeholder="Repita a senha" required>
+            </div>
+            
+            <p id="erro-senha" class="text-red-400 text-xs font-bold hidden">❌ As senhas não coincidem!</p>
+
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 shadow-lg mt-4 hx-boost="true">
+                Atualizar Senha
+            </button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('form-reset').addEventListener('submit', function(e) {
+            const senha1 = document.getElementById('nova_senha').value;
+            const senha2 = document.getElementById('confirma_senha').value;
+            
+            if (senha1 !== senha2) {
+                e.preventDefault(); // Impede o envio
+                document.getElementById('erro-senha').classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

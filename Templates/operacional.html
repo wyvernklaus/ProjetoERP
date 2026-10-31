@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Operacional - ERP{% endblock %}
+{% block content %}
+
+<header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-800 pb-4">
+    <div>
+        <h1 class="text-3xl font-black text-blue-500 flex items-center gap-2">
+            {{ icon('settings', '32') }} Operacional 
+            <span class="text-xs text-gray-500 bg-gray-900 px-2 py-1 rounded-full uppercase tracking-widest border border-gray-700">Chão de Fábrica</span>
+        </h1>
+    </div>
+    
+    <div class="flex gap-2 bg-gray-900 p-1 rounded-xl border border-gray-800 overflow-x-auto custom-scrollbar">
+        <button onclick="mudarAba('aba_os', this)" id="btn_aba_os" class="tab-btn flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg text-xs uppercase whitespace-nowrap shadow transition">
+            {{ icon('clipboard-list', '16') }} Fila de O.S.
+        </button>
+        <button onclick="mudarAba('aba_entregues', this)" id="btn_aba_entregues" class="tab-btn flex items-center gap-2 bg-transparent hover:bg-gray-800 text-gray-400 font-bold py-2 px-6 rounded-lg text-xs uppercase whitespace-nowrap transition">
+            {{ icon('check-circle', '16') }} Entregues
+        </button>
+        <button onclick="mudarAba('aba_insumos', this)" id="btn_aba_insumos" class="tab-btn flex items-center gap-2 bg-transparent hover:bg-gray-800 text-gray-400 font-bold py-2 px-6 rounded-lg text-xs uppercase whitespace-nowrap transition">
+            {{ icon('package', '16') }} Insumos
+        </button>
+        
+        {% if usuario.abas_permitidas and ('gerencia' in usuario.abas_permitidas or 'ti' in usuario.abas_permitidas) %}
+        <button onclick="mudarAba('aba_maquinas', this)" id="btn_aba_maquinas" class="tab-btn flex items-center gap-2 bg-transparent hover:bg-gray-800 text-gray-400 font-bold py-2 px-6 rounded-lg text-xs uppercase whitespace-nowrap transition">
+            {{ icon('truck', '16') }} Máquinas
+        </button>
+        {% endif %}
+    </div>
+</header>
+
+<div id="aba_os" class="aba-conteudo animate-fade-in">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for os in os_ativas %}
+        <div class="bg-gray-800 border-l-4 {{ 'border-red-500' if os.urgente else 'border-blue-500' }} rounded-2xl shadow-xl flex flex-col overflow-hidden">
+            <div class="p-4 bg-gray-900 border-b border-gray-700 flex justify-between items-start">
+                <div>
+                    <h4 class="font-black text-xl text-white">OS #{{ os.numero_os }}</h4>
+                    <p class="text-[10px] text-gray-400 uppercase">{{ os.empresa }}</p>
+                </div>
+                <div class="text-right">
+                    {% if os.urgente %}
+                    <span class="flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded bg-red-900 text-red-300 animate-pulse border border-red-700">
+                        {{ icon('alert-triangle', '12') }} URGENTE
+                    </span>
+                    {% else %}
+                    <span class="flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded bg-blue-900 text-blue-300 border border-blue-700">
+                        {{ icon('clock', '12') }} {{ os.status }}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="p-4 flex-1 space-y-3">
+                <p class="text-xs text-gray-300 flex items-center gap-1"><strong class="text-blue-400 uppercase flex items-center gap-1">{{ icon('tool', '12') }} Trabalho:</strong> {{ os.servicos }}</p>
+                
+                <div class="bg-black bg-opacity-40 p-3 rounded-lg text-xs font-sans text-gray-300 border border-gray-700 whitespace-pre-wrap h-48 overflow-y-auto custom-scrollbar">{{ os.detalhes | safe }}</div>
+                
+                {% if os.anexo %}
+                <div class="mt-2 p-2 bg-gray-900 border border-gray-700 rounded-lg text-center">
+                    <p class="text-[10px] text-gray-500 font-bold uppercase mb-2 flex items-center justify-center gap-1">{{ icon('paperclip', '12') }} Projetos Inclusos</p>
+                    <a href="/os/{{ os.id }}/imprimir" target="_blank" class="flex items-center justify-center gap-2 bg-indigo-900 hover:bg-indigo-800 border border-indigo-700 text-indigo-200 font-bold py-2 rounded-lg text-xs uppercase shadow transition">
+                        {{ icon('file-text', '14') }} Abrir Blueprint / PDF
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="p-4 bg-gray-950 border-t border-gray-800 flex flex-col gap-3">
+                {% if os.status == 'Fila' %}
+                <form action="/api/operacional/atualizar-os" method="POST" class="w-full">
+                    <input type="hidden" name="id_os" value="{{ os.id }}"><input type="hidden" name="acao" value="iniciar">
+                    <button type="submit" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg">
+                        {{ icon('play', '16') }} Iniciar Produção
+                    </button>
+                </form>
+                {% elif os.status == 'Em Andamento' %}
+
+                <button onclick="abrirMiniCam({{ os.id }})" class="flex items-center justify-center gap-2 bg-blue-900 hover:bg-blue-800 border border-blue-700 text-blue-300 font-bold py-3 px-3 rounded-xl text-xs transition w-full">
+                    {{ icon('cpu', '16') }} Preparar Arquivo CNC
+                </button>
+
+                <form action="/api/operacional/atualizar-os" method="POST" class="w-full" onsubmit="return confirm('Peças prontas? A O.S. será repassada para a Instalação/Montagem.');">
+                    <input type="hidden" name="id_os" value="{{ os.id }}"><input type="hidden" name="acao" value="concluir">
+                    <button type="submit" class="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg">
+                        {{ icon('check', '16') }} Peças Prontas
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full bg-gray-900 border border-gray-800 p-12 rounded-2xl text-center shadow-inner mt-6">
+            <div class="flex justify-center text-gray-600 mb-4 opacity-30">
+                {{ icon('coffee', '64') }}
+            </div>
+            <p class="text-gray-400 font-bold text-lg">A Fila está vazia.</p>
+            <p class="text-gray-500 text-sm mt-1">Nenhum arquivo aguardando impressão ou corte.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="aba_entregues" class="aba-conteudo hidden animate-fade-in">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden mt-4">
+        <table class="w-full text-left border-collapse text-sm">
+            <thead>
+                <tr class="bg-gray-950 text-xs uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                    <th class="p-4">Nº OS</th><th class="p-4">Serviço</th><th class="p-4">Cliente</th><th class="p-4 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">
+                {% for os in os_entregues %}
+                <tr class="hover:bg-gray-800 transition text-gray-300">
+                    <td class="p-4 font-bold text-gray-400">#{{ os.numero_os }}</td>
+                    <td class="p-4 text-yellow-500 font-bold text-xs">{{ os.servicos }}</td>
+                    <td class="p-4">{{ os.empresa }}</td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex items-center gap-1 bg-emerald-900 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded uppercase border border-emerald-700">
+                            {{ icon('check-circle', '12') }} Enviada p/ Frente
+                        </span>
+                    </td>
+                </tr>
+                {% else %}<tr><td colspan="4" class="p-8 text-center text-gray-500">Nenhum histórico recente.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="aba_insumos" class="aba-conteudo hidden animate-fade-in">
+    <div class="flex flex-col sm:flex-row justify-end gap-2 mb-6">
+        <button onclick="document.getElementById('modalNovoInsumo').classList.remove('hidden')" class="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase shadow transition">
+            {{ icon('plus-circle', '16') }} Novo Material
+        </button>
+        <button onclick="document.getElementById('modalNovoServico').classList.remove('hidden')" class="flex items-center gap-2 bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg text-xs uppercase shadow transition">
+            {{ icon('plus-circle', '16') }} Serviço Comercial
+        </button>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+        {% for item in insumos %}
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg flex flex-col justify-between">
+            <div>
+                <p class="text-gray-200 font-bold text-sm mb-1">{{ item.nome }}</p>
+                <p class="text-gray-500 text-xs uppercase font-bold flex items-center gap-1">Estoque: <strong class="{{ 'text-red-500 animate-pulse' if item.quantidade <= 0 else 'text-emerald-500' }}">{{ item.quantidade }} {{ item.unidade }}</strong></p>
+            </div>
+            <form action="/api/operacional/alerta-estoque" method="POST" class="mt-4" onsubmit="return confirm('Avisar Administração sobre este item?');">
+                <input type="hidden" name="nome_insumo" value="{{ item.nome }}">
+                <button type="submit" class="w-full flex items-center justify-center gap-2 bg-red-900 hover:bg-red-800 text-red-200 font-bold py-2.5 rounded-lg text-[10px] uppercase tracking-widest shadow border border-red-700 transition">
+                    {{ icon('alert-triangle', '14') }} Avisar Compras
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <p class="col-span-full text-center text-gray-500 p-8">Nenhum insumo registado.</p>
+        {% endfor %}
+    </div>
+</div>
+
+{% if usuario.abas_permitidas and ('gerencia' in usuario.abas_permitidas or 'ti' in usuario.abas_permitidas) %}
+<div id="aba_maquinas" class="aba-conteudo hidden animate-fade-in">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6 mt-4">
+        <div>
+            <p class="text-gray-400 text-xs">A Router DDCS 3.1 deve ser atualizada manualmente aqui.</p>
+        </div>
+        <button onclick="document.getElementById('modalNovaMaquina').classList.remove('hidden')" class="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2.5 px-4 rounded-lg text-xs uppercase shadow transition">
+            {{ icon('plus-circle', '16') }} Registar Nova Máquina
+        </button>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for m in maquinas %}
+        <div class="bg-gray-800 border {{ 'border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]' if m.status == 'Operando' else 'border-red-900 opacity-80' if m.status == 'Inoperante' else 'border-gray-700' }} rounded-2xl p-5 shadow-lg flex flex-col justify-between relative overflow-hidden transition-all group">
+            
+            {% if m.status == 'Operando' %}
+            <div class="absolute inset-0 bg-emerald-900 opacity-10 animate-pulse pointer-events-none"></div>
+            {% elif m.status == 'Inoperante' %}
+            <div class="absolute inset-0 bg-red-950 opacity-20 pointer-events-none"></div>
+            {% endif %}
+
+            <div class="relative z-10 flex items-start justify-between mb-4">
+                <div class="flex items-center gap-4">
+                    <div class="{{ 'grayscale opacity-50' if m.status == 'Inoperante' else 'text-blue-400' }}">
+                        {% if 'laser' in m.nome.lower() %}{{ icon('zap', '40') }}
+                        {% elif 'latex' in m.nome.lower() or 'epson' in m.nome.lower() or 'uv' in m.nome.lower() %}{{ icon('printer', '40') }}
+                        {% elif 'plotter' in m.nome.lower() or 'mimaki' in m.nome.lower() %}{{ icon('scissors', '40') }}
+                        {% else %}{{ icon('cpu', '40') }}{% endif %}
+                    </div>
+                    <div>
+                        <h3 class="text-white font-black text-lg {{ 'line-through text-red-500' if m.status == 'Inoperante' else '' }}">{{ m.nome }}</h3>
+                        <span class="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest {{ 'bg-emerald-900 text-emerald-400 border border-emerald-700' if m.status == 'Operando' else 'bg-gray-900 text-gray-400 border border-gray-600' if m.status == 'Livre' else 'bg-black text-red-600 border border-red-900' if m.status == 'Inoperante' else 'bg-red-900 text-red-400 border border-red-700' }}">
+                            {{ m.status }}
+                        </span>
+                    </div>
+                </div>
+                <button onclick='abrirModalEditarMaquina({{ {"id": m.id, "nome": m.nome, "tamanho_util": m.tamanho_util, "materiais_permitidos": m.materiais_permitidos, "materiais_proibidos": m.materiais_proibidos, "velocidade_corte": m.velocidade_corte, "status": m.status} | tojson | safe }})' class="text-gray-500 hover:text-blue-400 bg-gray-900 hover:bg-gray-800 p-2 rounded-lg transition shadow border border-gray-700" title="Editar / Atualizar Desgaste">
+                    {{ icon('edit-2', '16') }}
+                </button>
+            </div>
+
+            <div class="relative z-10 bg-black bg-opacity-60 p-3 rounded-lg border border-gray-900 mb-4 space-y-2 text-[10px] text-gray-400">
+                <p class="flex items-center gap-1"><strong class="text-gray-300 uppercase flex items-center gap-1">{{ icon('maximize', '12') }} Área Útil:</strong> <span class="text-yellow-400 font-mono">{{ m.tamanho_util if m.tamanho_util else '-' }}</span></p>
+                <p class="flex items-center gap-1"><strong class="text-emerald-500 uppercase flex items-center gap-1">{{ icon('check', '12') }} Permite:</strong> {{ m.materiais_permitidos if m.materiais_permitidos else '-' }}</p>
+                <p class="flex items-center gap-1"><strong class="text-red-500 uppercase flex items-center gap-1">{{ icon('x', '12') }} Proibido:</strong> {{ m.materiais_proibidos if m.materiais_proibidos else '-' }}</p>
+                {% if m.velocidade_corte %}
+                <div class="border-t border-gray-700 pt-2 mt-2">
+                    <strong class="text-blue-400 uppercase flex items-center gap-1">{{ icon('zap', '12') }} Tabela de Velocidades:</strong>
+                    <p class="whitespace-pre-wrap font-mono mt-1 text-gray-300">{{ m.velocidade_corte }}</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="relative z-10 bg-gray-950 p-3 rounded-lg border border-gray-900 min-h-[50px] flex flex-col justify-center mb-4">
+                <p class="text-[9px] text-gray-500 uppercase font-bold mb-1">Trabalho Atual:</p>
+                {% if m.status == 'Operando' and m.arquivo_atual %}
+                    <p class="text-emerald-400 font-mono text-xs font-bold break-words">{{ m.arquivo_atual }}</p>
+                {% else %}
+                    <p class="text-gray-600 font-mono text-xs italic">Nenhum ficheiro na fila.</p>
+                {% endif %}
+            </div>
+
+            <div class="relative z-10 grid grid-cols-2 gap-2 mt-auto border-t border-gray-700 pt-3">
+                {% if m.status == 'Inoperante' %}
+                    <div class="col-span-2 flex items-center justify-center gap-2 py-2 bg-black border border-red-900 rounded-lg text-red-600 text-xs font-black uppercase tracking-widest shadow-inner">
+                        {{ icon('alert-octagon', '14') }} EQUIPAMENTO DESATIVADO
+                    </div>
+                {% elif m.status == 'Em Manutenção' %}
+                    <form action="/api/operacional/atualizar-maquina" method="POST" class="col-span-2 w-full">
+                        <input type="hidden" name="id_maquina" value="{{ m.id }}"><input type="hidden" name="status" value="Livre"><input type="hidden" name="arquivo" value="">
+                        <button type="submit" class="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 rounded-lg text-[10px] uppercase transition shadow border border-emerald-600">
+                            {{ icon('check-circle', '14') }} Concluir Manutenção
+                        </button>
+                    </form>
+                {% else %}
+                    {% if m.status != 'Operando' %}
+                    <button onclick="abrirModalPlayMaquina({{ m.id }}, '{{ m.nome }}')" class="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold py-2 rounded-lg text-[10px] uppercase transition shadow">
+                        {{ icon('play', '14') }} Iniciar
+                    </button>
+                    {% else %}
+                    <form action="/api/operacional/atualizar-maquina" method="POST" class="w-full">
+                        <input type="hidden" name="id_maquina" value="{{ m.id }}"><input type="hidden" name="status" value="Livre"><input type="hidden" name="arquivo" value="">
+                        <button type="submit" class="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-[10px] uppercase transition shadow">
+                            {{ icon('square', '14') }} Parar (Livre)
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <form action="/api/operacional/atualizar-maquina" method="POST" class="w-full">
+                        <input type="hidden" name="id_maquina" value="{{ m.id }}"><input type="hidden" name="status" value="Em Manutenção"><input type="hidden" name="arquivo" value="Parada Técnica">
+                        <button type="submit" class="w-full flex items-center justify-center gap-2 bg-red-900 hover:bg-red-800 text-red-300 font-bold py-2 rounded-lg text-[10px] uppercase transition shadow border border-red-800">
+                            {{ icon('wrench', '14') }} Manutenção
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="col-span-full text-center text-gray-500 p-8">Nenhuma máquina registada.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- OS MODAIS DE MÁQUINA AQUI, mantendo o JS original com pequenos ajustes visuais -->
+<div id="modalEditarMaquina" class="hidden fixed inset-0 bg-black bg-opacity-80 z-[70] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[95vh] overflow-y-auto custom-scrollbar">
+        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-2">
+            <h3 class="font-bold text-xl text-blue-400 flex items-center gap-2">{{ icon('edit-2', '24') }} Atualizar Equipamento</h3>
+            <button onclick="document.getElementById('modalEditarMaquina').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        
+        <form id="formEditarMaquina" action="/api/operacional/editar-maquina" method="POST" class="space-y-5">
+            <input type="hidden" name="id_maquina" id="edit_maq_id">
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome / Apelido</label>
+                    <input type="text" name="nome" id="edit_maq_nome" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Área Útil</label>
+                    <input type="text" name="tamanho_util" id="edit_maq_tamanho" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm focus:border-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-emerald-500 uppercase mb-1">{{ icon('check', '12') }} Materiais Permitidos</label>
+                <input type="text" name="materiais_permitidos" id="edit_maq_permitidos" class="w-full bg-black border border-emerald-900 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-red-500 uppercase mb-1">{{ icon('x', '12') }} Materiais Proibidos</label>
+                <input type="text" name="materiais_proibidos" id="edit_maq_proibidos" class="w-full bg-black border border-red-900 rounded p-2 text-white text-sm focus:border-red-500 outline-none">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold text-blue-400 uppercase mb-1">{{ icon('zap', '12') }} Atualizar Velocidade (Digitar a nova medição)</label>
+                <textarea name="velocidade_corte" id="edit_maq_velocidade" rows="3" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm font-mono focus:border-blue-500 outline-none"></textarea>
+            </div>
+
+            <div class="hidden">
+                <input type="text" name="status" id="edit_maq_status">
+            </div>
+            
+            <div class="flex gap-2 mt-6">
+                <button type="button" onclick="marcarInoperante()" class="w-1/3 flex items-center justify-center gap-1 bg-black hover:bg-red-950 text-red-600 font-black tracking-widest py-3 rounded-lg text-xs uppercase transition shadow border border-red-900">{{ icon('alert-triangle', '14') }} INOPERANTE</button>
+                <button type="button" onclick="salvarEdicaoNormal()" class="w-2/3 flex items-center justify-center gap-2 bg-blue-700 hover:bg-blue-600 text-white font-black tracking-widest py-3 rounded-lg text-sm uppercase transition shadow border border-blue-500">{{ icon('save', '18') }} Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalNovoInsumo" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"><div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-sm p-6"><div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2"><h3 class="font-bold text-emerald-500 flex items-center gap-2">{{ icon('plus-circle', '20') }} Novo Insumo</h3><button onclick="document.getElementById('modalNovoInsumo').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><form action="/api/operacional/novo-insumo" method="POST" class="space-y-4"><input type="text" name="nome" placeholder="Nome (Ex: ACM Azul 3mm)" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm"><div class="flex gap-2"><input type="number" step="0.1" name="quantidade" placeholder="Qtd Inicial" required class="w-1/2 bg-black border border-gray-700 rounded p-2 text-white text-sm"><select name="unidade" class="w-1/2 bg-black border border-gray-700 rounded p-2 text-white text-sm"><option value="un">Unidade</option><option value="chapas">Chapas</option><option value="metros">Metros</option><option value="kg">KG</option></select></div><button type="submit" class="w-full flex items-center justify-center gap-2 bg-emerald-700 text-white font-bold py-3 rounded-lg text-sm uppercase shadow">{{ icon('save', '16') }} Guardar no Estoque</button></form></div></div>
+<div id="modalNovoServico" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"><div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-sm p-6"><div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2"><h3 class="font-bold text-indigo-500 flex items-center gap-2">{{ icon('plus-circle', '20') }} Enviar Padrão p/ Comercial</h3><button onclick="document.getElementById('modalNovoServico').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><form action="/api/operacional/novo-servico" method="POST" class="space-y-4"><p class="text-[10px] text-gray-400">Isto criará uma opção nova no ecrã do Comercial.</p><input type="text" name="nome" placeholder="Nome do Serviço (Ex: Gravação Laser)" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm"><button type="submit" class="w-full flex items-center justify-center gap-2 bg-indigo-700 text-white font-bold py-3 rounded-lg text-sm uppercase shadow">{{ icon('plus', '16') }} Criar Serviço</button></form></div></div>
+<div id="modalNovaMaquina" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"><div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[95vh] overflow-y-auto custom-scrollbar"><div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-2"><h3 class="font-bold text-xl text-emerald-500 flex items-center gap-2">{{ icon('truck', '24') }} Configurar Equipamento</h3><button onclick="document.getElementById('modalNovaMaquina').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><form action="/api/operacional/nova-maquina" method="POST" class="space-y-5"><div class="grid grid-cols-2 gap-4"><div><label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome do Equipamento</label><input type="text" name="nome" placeholder="Ex: GLC 1290" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"></div><div><label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Área Útil (X e Y)</label><input type="text" name="tamanho_util" placeholder="Ex: 1300 x 900 mm" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"></div></div><div><label class="block text-[10px] font-bold text-emerald-500 uppercase mb-1">{{ icon('check', '12') }} Materiais Permitidos (Separados por vírgula)</label><input type="text" name="materiais_permitidos" placeholder="Ex: Acrílico, MDF, PETG, Tecido" class="w-full bg-black border border-emerald-900 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"></div><div><label class="block text-[10px] font-bold text-red-500 uppercase mb-1">{{ icon('x', '12') }} Materiais Proibidos (Gera Fogo/Gás Tóxico)</label><input type="text" name="materiais_proibidos" placeholder="Ex: PVC, Vinil, Teflon" class="w-full bg-black border border-red-900 rounded p-2 text-white text-sm focus:border-red-500 outline-none"></div><div><label class="block text-[10px] font-bold text-blue-400 uppercase mb-1">{{ icon('zap', '12') }} Tabela de Velocidades / Precificação (Opcional)</label><textarea name="velocidade_corte" rows="3" placeholder="Ex: Acrílico 2mm = 15mm/s" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm font-mono focus:border-blue-500 outline-none"></textarea></div><div><label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Status Inicial</label><select name="status" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm"><option value="Livre">🟢 Livre / Operante</option><option value="Em Manutenção">🔴 Em Manutenção</option></select></div><button type="submit" class="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white font-black tracking-widest py-4 rounded-lg text-sm uppercase transition shadow-lg mt-4 border border-emerald-500">{{ icon('save', '20') }} Gravar Parâmetros</button></form></div></div>
+<div id="modalPlayMaquina" class="hidden fixed inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center p-4"><div class="bg-gray-900 border-2 border-emerald-500 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] w-full max-w-sm p-6"><div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2"><h3 class="font-bold text-white flex items-center gap-2">{{ icon('play', '20') }} Iniciar Produção</h3><button onclick="document.getElementById('modalPlayMaquina').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button></div><p id="lbl_nome_play" class="text-xs text-gray-400 mb-4 font-mono uppercase bg-black p-2 rounded text-center"></p><form action="/api/operacional/atualizar-maquina" method="POST" class="space-y-4"><input type="hidden" name="id_maquina" id="input_play_id"><input type="hidden" name="status" value="Operando"><div><label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome do Ficheiro / O.S.</label><input type="text" name="arquivo" placeholder="Ex: OS 5642 - Fachada ACM" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"></div><button type="submit" class="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-sm uppercase transition shadow tracking-widest">{{ icon('check', '18') }} Confirmar Início</button></form></div></div>
+
+<div id="modalCncCam" class="hidden fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-gray-800 bg-gray-950 flex justify-between items-center">
+            <h3 class="font-black text-xl text-blue-500 flex items-center gap-2">{{ icon('cpu', '24') }} Preparar Usinagem CNC</h3>
+            <div class="flex gap-4">
+                <button type="button" onclick="document.getElementById('modalNovaFresa').classList.remove('hidden')" class="flex items-center gap-1 text-xs bg-blue-900 text-blue-300 px-3 py-1 rounded font-bold hover:bg-blue-800 transition shadow">{{ icon('plus', '14') }} Gerenciar Fresas</button>
+                <button onclick="document.getElementById('modalCncCam').classList.add('hidden')" class="text-gray-400 hover:text-white text-3xl font-light">&times;</button>
+            </div>
+        </div>
+
+        <form action="/api/operacional/processar-cnc" method="POST" enctype="multipart/form-data" class="p-6 space-y-6">
+            <input type="hidden" name="id_os" id="cnc_id_os">
+            
+            <div class="bg-blue-900 bg-opacity-20 border border-blue-800 p-4 rounded-lg flex items-center gap-4">
+                <div class="text-blue-400">
+                    {{ icon('file-text', '32') }}
+                </div>
+                <div class="flex-1">
+                    <label class="block text-xs font-bold text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1">{{ icon('paperclip', '12') }} Anexar Arquivo Revisado (.DXF ou .SVG)</label>
+                    <input type="file" name="arquivo_vetor" accept=".dxf,.svg,.cdr" required class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">                </div>
+            </div>
+            
+            <div class="mt-2 w-full h-48 bg-black border border-dashed border-gray-600 rounded-lg flex items-center justify-center overflow-hidden relative">
+                <span id="preview_texto" class="text-gray-600 text-xs font-bold uppercase tracking-widest">A visualização aparecerá aqui</span>
+                <img id="preview_img" class="hidden max-h-full max-w-full object-contain p-2" />
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">1. Selecione a Máquina</label>
+                    <select id="cnc_maquina" name="id_maquina" onchange="filtrarMateriaisDaMaquina()" class="w-full bg-black border border-gray-700 rounded-lg p-3 text-sm text-white outline-none focus:border-blue-500 cursor-pointer" required>
+                        <option value="">Selecione...</option>
+                        {% for maq in maquinas %}
+                        <option value="{{ maq.id }}" data-permitidos="{{ maq.materiais_permitidos }}">{{ maq.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">2. Material Permitido p/ esta Máquina</label>
+                    <select id="cnc_material" name="id_material" class="w-full bg-black border border-gray-700 rounded-lg p-3 text-sm text-white outline-none focus:border-blue-500 cursor-pointer" required>
+                        <option value="">Selecione a máquina primeiro...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">3. Fresa Utilizada</label>
+                    <select name="id_fresa" class="w-full bg-black border border-gray-700 rounded-lg p-3 text-sm text-white outline-none focus:border-blue-500 cursor-pointer" required>
+                        {% for f in fresas %}
+                        <option value="{{ f.id }}">{{ f.nome }} ({{ f.diametro }}mm)</option>
+                        {% else %}
+                        <option value="">Nenhuma fresa cadastrada!</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">4. Espessura da Peça (mm)</label>
+                    <input type="number" step="0.1" name="espessura" placeholder="Ex: 15.0" required class="w-full bg-black border border-gray-700 rounded-lg p-3 text-sm text-white font-mono outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black tracking-widest py-4 rounded-xl text-sm uppercase transition shadow-lg">
+                {{ icon('rocket', '20') }} Validar e Gerar G-Code
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="modalNovaFresa" class="hidden fixed inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] flex flex-col">
+        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+            <h3 class="font-bold text-xl text-blue-400 flex items-center gap-2">{{ icon('database', '24') }} Biblioteca de Fresas</h3>
+            <button onclick="document.getElementById('modalNovaFresa').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <div class="overflow-y-auto custom-scrollbar mb-6 border border-gray-800 rounded-lg bg-black flex-1 min-h-[150px]">
+            <table class="w-full text-left text-sm text-gray-300">
+                <thead class="bg-gray-950 text-[10px] uppercase text-gray-500 border-b border-gray-800">
+                    <tr>
+                        <th class="p-3">Nome da Fresa</th>
+                        <th class="p-3 text-center">Diâmetro</th>
+                        <th class="p-3 text-center">Stepdown</th>
+                        <th class="p-3 text-center">Ação</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for f in fresas %}
+                    <tr class="hover:bg-gray-900 transition">
+                        <td class="p-3 font-bold">{{ f.nome }}</td>
+                        <td class="p-3 text-center font-mono text-blue-400">{{ f.diametro }}mm</td>
+                        <td class="p-3 text-center font-mono text-emerald-400">{{ f.max_stepdown }}mm</td>
+                        <td class="p-3 text-center">
+                            <form action="/api/operacional/excluir-fresa" method="POST" onsubmit="return confirm('Deseja excluir permanentemente a fresa {{ f.nome }}?');">
+                                <input type="hidden" name="id_fresa" value="{{ f.id }}">
+                                <button type="submit" class="flex items-center gap-1 text-red-500 hover:text-red-400 hover:bg-red-950 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider transition mx-auto">{{ icon('trash-2', '14') }} Apagar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="p-6 text-center text-gray-500 text-xs">Nenhuma fresa cadastrada na biblioteca.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="border-t border-gray-800 pt-4">
+            <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-widest flex items-center gap-1">{{ icon('plus-circle', '14') }} Adicionar Nova</h4>
+            <form action="/api/operacional/nova-fresa" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome / Tipo da Fresa</label>
+                    <input type="text" name="nome" placeholder="Ex: Reta 2 Cortes - Metal Duro" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm focus:border-blue-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Diâmetro (mm)</label>
+                        <input type="number" step="0.1" name="diametro" placeholder="Ex: 4.0" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm font-mono focus:border-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stepdown Máx</label>
+                        <input type="number" step="0.1" name="max_stepdown" placeholder="Ex: 5.0" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm font-mono focus:border-blue-500 outline-none" title="O máximo que ela aguenta descer no material por passada.">
+                    </div>
+                </div>
+                <button type="submit" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold tracking-widest py-3 rounded-lg text-xs uppercase mt-2 transition shadow">{{ icon('save', '16') }} Salvar Fresa</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// ==========================================
+// 1. DADOS INJETADOS E FUNÇÕES UTILITÁRIAS
+// ==========================================
+const bibliotecaMateriais = [
+    {% for mat in materiais_cnc %}
+    { id: {{ mat.id }}, nome: "{{ mat.nome }}" },
+    {% endfor %}
+];
+
+function formatarTexto(str) {
+    return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+}
+
+// ==========================================
+// 2. NAVEGAÇÃO DE ABAS
+// ==========================================
+function mudarAba(idAba, botaoClicado) {
+    document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('hidden'));
+    document.getElementById(idAba).classList.remove('hidden');
+    
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-blue-600', 'text-white');
+        btn.classList.add('bg-transparent', 'text-gray-400');
+    });
+    
+    botaoClicado.classList.remove('bg-transparent', 'text-gray-400');
+    botaoClicado.classList.add('bg-blue-600', 'text-white');
+}
+
+// ==========================================
+// 3. FILTROS E MINI-CAM DA CNC
+// ==========================================
+function filtrarMateriaisDaMaquina() {
+    const selectMaq = document.getElementById('cnc_maquina');
+    const selectMat = document.getElementById('cnc_material');
+    
+    const opcaoSelecionada = selectMaq.options[selectMaq.selectedIndex];
+    const permitidosStr = opcaoSelecionada.getAttribute('data-permitidos') || "";
+    const permitidosArr = permitidosStr.split(',').map(s => formatarTexto(s));
+
+    selectMat.innerHTML = '<option value="">Selecione o Material...</option>';
+    let achouCompativel = false;
+
+    bibliotecaMateriais.forEach(mat => {
+        if (permitidosStr === "" || permitidosArr.includes(formatarTexto(mat.nome))) {
+            selectMat.innerHTML += `<option value="${mat.id}">${mat.nome}</option>`;
+            achouCompativel = true;
+        }
+    });
+
+    if(!achouCompativel) {
+        selectMat.innerHTML = '<option value="">⚠️ Nenhum material compatível com esta máquina!</option>';
+    }
+}
+
+function abrirMiniCam(id_os) {
+    document.getElementById('cnc_id_os').value = id_os;
+    document.getElementById('modalCncCam').classList.remove('hidden');
+}
+
+// PREVIEW DO VETOR / CDR
+const inputVetor = document.querySelector('input[name="arquivo_vetor"]');
+if(inputVetor) {
+    inputVetor.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const previewImg = document.getElementById('preview_img');
+        const previewTexto = document.getElementById('preview_texto');
+
+        if (file && file.name.toLowerCase().endsWith('.svg')) {
+            const reader = new FileReader();
+            reader.onload = function(evento) {
+                previewImg.src = evento.target.result;
+                previewImg.classList.remove('hidden');
+                previewTexto.classList.add('hidden');
+            }
+            reader.readAsDataURL(file);
+        } 
+        else if (file && file.name.toLowerCase().endsWith('.cdr')) {
+            previewImg.classList.add('hidden');
+            previewTexto.classList.remove('hidden');
+            previewTexto.innerHTML = `
+                <div class="text-center">
+                    <i data-lucide="wand-2" class="w-12 h-12 text-blue-500 mx-auto mb-2 animate-pulse"></i>
+                    <span class="text-blue-400 font-black">Arquivo CorelDRAW detectado.</span><br>
+                    <span class="text-[10px] text-gray-400 normal-case tracking-normal">O robô do ERP converterá este arquivo em vetor de usinagem automaticamente no momento do upload.</span>
+                </div>`;
+            lucide.createIcons();
+        }
+        else if (file) {
+            previewImg.classList.add('hidden');
+            previewTexto.classList.remove('hidden');
+            previewTexto.innerHTML = `<span class="text-blue-400 font-bold">Arquivo ${file.name} anexado.</span>`;
+        }
+    });
+}
+
+// ==========================================
+// 4. MÁQUINAS: EDIÇÃO E PLAY
+// ==========================================
+function abrirModalPlayMaquina(id, nome) {
+    document.getElementById('input_play_id').value = id;
+    document.getElementById('lbl_nome_play').innerText = "Máquina: " + nome;
+    document.getElementById('modalPlayMaquina').classList.remove('hidden');
+}
+
+let statusAtualDaMaquinaOriginal = "";
+
+function abrirModalEditarMaquina(maq) {
+    document.getElementById('edit_maq_id').value = maq.id;
+    document.getElementById('edit_maq_nome').value = maq.nome;
+    document.getElementById('edit_maq_tamanho').value = maq.tamanho_util || '';
+    document.getElementById('edit_maq_permitidos').value = maq.materiais_permitidos || '';
+    document.getElementById('edit_maq_proibidos').value = maq.materiais_proibidos || '';
+    document.getElementById('edit_maq_velocidade').value = maq.velocidade_corte || '';
+    
+    statusAtualDaMaquinaOriginal = maq.status;
+    document.getElementById('edit_maq_status').value = maq.status;
+    
+    document.getElementById('modalEditarMaquina').classList.remove('hidden');
+}
+
+function salvarEdicaoNormal() {
+    document.getElementById('edit_maq_status').value = statusAtualDaMaquinaOriginal;
+    document.getElementById('formEditarMaquina').submit();
+}
+
+function marcarInoperante() {
+    if(confirm('⚠️ ATENÇÃO: Tem certeza que deseja marcar esta máquina como INOPERANTE?')) {
+        document.getElementById('edit_maq_status').value = 'Inoperante';
+        document.getElementById('formEditarMaquina').submit();
+    }
+}
+</script>
+{% endblock %}

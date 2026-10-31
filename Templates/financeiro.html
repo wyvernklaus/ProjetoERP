@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Financeiro - ERP{% endblock %}
+
+{% block content %}
+<header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-800 pb-6">
+    <div class="flex items-center gap-3">
+        <div class="p-3 bg-emerald-500 bg-opacity-10 rounded-xl text-emerald-500 border border-emerald-500 border-opacity-20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+            {{ icon('landmark', '32') }}
+        </div>
+        <div>
+            <h1 class="text-3xl font-bold text-gray-100">Módulo Financeiro</h1>
+            <p class="text-gray-400 mt-1">Controle de contas a pagar, a receber e fluxo de caixa.</p>
+        </div>
+    </div>
+    <div>
+        <button onclick="document.getElementById('modalNovoLancamento').classList.remove('hidden')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg uppercase text-xs tracking-wider transition shadow flex items-center gap-2">
+            {{ icon('plus-circle', '16') }} Novo Lançamento
+        </button>
+    </div>
+</header>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-xl relative overflow-hidden">
+        <div class="absolute -right-6 -top-6 text-blue-500 opacity-10 pointer-events-none">{{ icon('arrow-down-right', '100') }}</div>
+        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">{{ icon('inbox', '14') }} A Receber (Pendente)</h3>
+        <p class="text-3xl font-black text-blue-400 mt-2">R$ {{ "%.2f"|format(total_receber) }}</p>
+    </div>
+    <div class="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-xl relative overflow-hidden">
+        <div class="absolute -right-6 -top-6 text-red-500 opacity-10 pointer-events-none">{{ icon('arrow-up-right', '100') }}</div>
+        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">{{ icon('outbox', '14') }} A Pagar (Pendente)</h3>
+        <p class="text-3xl font-black text-red-400 mt-2">R$ {{ "%.2f"|format(total_pagar) }}</p>
+    </div>
+    <div class="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-xl relative overflow-hidden">
+        <div class="absolute -right-6 -top-6 text-emerald-500 opacity-10 pointer-events-none">{{ icon('wallet', '100') }}</div>
+        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">{{ icon('activity', '14') }} Saldo Realizado (Mês)</h3>
+        <p class="text-3xl font-black {{ 'text-emerald-400' if saldo >= 0 else 'text-red-400' }} mt-2">R$ {{ "%.2f"|format(saldo) }}</p>
+    </div>
+</div>
+
+<div class="bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden">
+    <div class="p-4 bg-gray-950 border-b border-gray-800">
+        <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wide flex items-center gap-2">
+            {{ icon('list', '18') }} Extrato de Lançamentos
+        </h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+            <thead>
+                <tr class="bg-gray-950 text-xs uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                    <th class="p-4">Status</th>
+                    <th class="p-4">Tipo</th>
+                    <th class="p-4">Descrição</th>
+                    <th class="p-4">Vencimento</th>
+                    <th class="p-4 text-right">Valor</th>
+                    <th class="p-4 text-center">Ação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">
+                {% for l in lancamentos %}
+                <tr class="hover:bg-gray-800 transition text-gray-300">
+                    <td class="p-4">
+                        {% if l.status == 'Pago' %}
+                            <span class="inline-flex items-center gap-1 bg-emerald-900 bg-opacity-30 text-emerald-400 font-bold text-[10px] px-2 py-1 rounded uppercase border border-emerald-800">{{ icon('check-circle', '12') }} Pago</span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 bg-amber-900 bg-opacity-30 text-amber-400 font-bold text-[10px] px-2 py-1 rounded uppercase border border-amber-800">{{ icon('clock', '12') }} Pendente</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4">
+                        {% if l.tipo == 'RECEITA' %}
+                            <span class="text-blue-400 font-bold text-xs flex items-center gap-1">{{ icon('arrow-down-right', '14') }} Receita</span>
+                        {% else %}
+                            <span class="text-red-400 font-bold text-xs flex items-center gap-1">{{ icon('arrow-up-right', '14') }} Despesa</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4">
+                        <span class="font-bold text-white block">{{ l.descricao }}</span>
+                        <span class="text-[10px] text-gray-500">{{ l.categoria }} {% if l.os_referencia %} | OS: {{ l.os_referencia }}{% endif %}</span>
+                    </td>
+                    <td class="p-4 font-mono text-xs">{{ l.data_vencimento.split('-')|reverse|join('/') }}</td>
+                    <td class="p-4 text-right font-mono font-bold {{ 'text-blue-400' if l.tipo == 'RECEITA' else 'text-red-400' }}">
+                        R$ {{ "%.2f"|format(l.valor) }}
+                    </td>
+                    <td class="p-4 text-center">
+                        {% if l.status == 'Pendente' %}
+                        <form action="/api/financeiro/baixar" method="POST">
+                            <input type="hidden" name="id_lancamento" value="{{ l.id }}">
+                            <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded text-[10px] uppercase transition shadow border border-gray-600">
+                                Dar Baixa
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-[10px] text-gray-500 font-bold uppercase">{{ l.data_pagamento.split('-')|reverse|join('/') if l.data_pagamento else '' }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="p-8 text-center text-gray-500">Nenhum lançamento financeiro registrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modalNovoLancamento" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md p-6">
+        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-3">
+            <h3 class="font-bold text-lg text-emerald-400 flex items-center gap-2">{{ icon('plus-circle', '20') }} Novo Lançamento</h3>
+            <button onclick="document.getElementById('modalNovoLancamento').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <form action="/api/financeiro/novo" method="POST" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tipo</label>
+                    <select name="tipo" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm outline-none focus:border-emerald-500 cursor-pointer">
+                        <option value="RECEITA">🟢 Receita (Entrada)</option>
+                        <option value="DESPESA">🔴 Despesa (Saída)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Valor (R$)</label>
+                    <input type="number" step="0.01" name="valor" required placeholder="0.00" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm outline-none focus:border-emerald-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Descrição</label>
+                <input type="text" name="descricao" required placeholder="Ex: Pagamento Fornecedor ACM" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm outline-none focus:border-emerald-500">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Categoria</label>
+                    <input type="text" name="categoria" placeholder="Ex: Matéria-prima" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Vencimento</label>
+                    <input type="date" name="data_vencimento" required class="w-full bg-black border border-gray-700 rounded p-2 text-white text-sm outline-none focus:border-emerald-500">
+                </div>
+            </div>
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg text-sm uppercase transition shadow mt-4 flex items-center justify-center gap-2">
+                {{ icon('save', '18') }} Registrar Lançamento
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

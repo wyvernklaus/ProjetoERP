@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Gestão de Equipe - ERP{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-800 pb-6">
+    <div class="flex items-center gap-3">
+        <div class="p-3 bg-emerald-500 bg-opacity-10 rounded-xl text-emerald-500 border border-emerald-500 border-opacity-20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+            {{ icon('users', '32') }}
+        </div>
+        <div>
+            <h1 class="text-3xl font-bold text-gray-100">Gestão de Equipe e Acessos</h1>
+            <p class="text-gray-400 mt-1">Gerencie cadastros, permissões de máquinas e segurança.</p>
+        </div>
+    </div>
+    <div class="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
+        <button onclick="abrirModal('modalNovoUsuario')" class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition shadow">
+            {{ icon('user-plus', '16') }} Novo Colaborador
+        </button>
+        <a href="/administracao" class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm border border-gray-700 transition">
+            {{ icon('arrow-left', '16') }} Voltar
+        </a>
+    </div>
+</div>
+
+<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden mb-8">
+    <div class="p-4 bg-gray-900 border-b border-gray-700">
+        <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wide flex items-center gap-2">
+            {{ icon('contact', '18') }} Quadro Geral de Colaboradores
+        </h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-950 text-xs uppercase tracking-wider text-gray-400 border-b border-gray-800">
+                    <th class="p-4 font-bold">Nome Completo</th>
+                    <th class="p-4 font-bold">Cargo / Função</th>
+                    <th class="p-4 font-bold">Tempo de Empresa</th>
+                    <th class="p-4 font-bold">Próximas Férias</th>
+                    <th class="p-4 font-bold text-center">Status</th>
+                    <th class="p-4 font-bold text-center">Painel</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800 text-sm">
+                {% for func in lista_usuarios %}
+                <tr class="transition {% if func.status_colaborador == 'Desativado' or not func.ativo %}bg-gray-950 bg-opacity-40 text-gray-500 opacity-60{% else %}hover:bg-gray-750 text-gray-200{% endif %}">
+                    <td class="p-4 font-medium {% if func.status_colaborador == 'Desativado' or not func.ativo %}line-through{% else %}text-white{% endif %}">{{ func.nome }}</td>
+                    <td class="p-4 font-medium {% if func.status_colaborador == 'Desativado' %}text-gray-600{% else %}text-yellow-500{% endif %}">{{ func.cargo }}</td>
+                    <td class="p-4 font-mono text-xs text-gray-400" data-admissao="{{ func.data_admissao if func.data_admissao else '' }}">{{ func.data_admissao if func.data_admissao else 'Não informada' }}</td>
+                    <td class="p-4 text-xs font-semibold celula-ferias" data-fim-ferias="{{ func.ferias_inicio if func.ferias_inicio else '' }}">
+                        {% if func.ferias_inicio %}
+                        <span class="flex items-center gap-1">{{ icon('calendar', '12') }} {{ func.ferias_inicio }}</span>
+                        {% else %}<span class="text-gray-600">Não agendadas</span>{% endif %}
+                    </td>
+                    <td class="p-4 text-center">
+                        {% if func.status_colaborador == 'Ativo' or (func.ativo and not func.status_colaborador) %}
+                            <span class="inline-flex items-center gap-1 bg-green-900 bg-opacity-30 text-green-400 border border-green-800 text-[10px] px-2.5 py-1 rounded-full uppercase font-bold tracking-wider">{{ icon('check-circle', '12') }} Ativo</span>
+                        {% elif func.status_colaborador == 'Férias' %}
+                            <span class="inline-flex items-center gap-1 bg-blue-900 bg-opacity-30 text-blue-400 border border-blue-800 text-[10px] px-2.5 py-1 rounded-full uppercase font-bold tracking-wider animate-pulse">{{ icon('palmtree', '12') }} Férias</span>
+                        {% elif func.status_colaborador == 'Licença' %}
+                            <span class="inline-flex items-center gap-1 bg-amber-900 bg-opacity-30 text-amber-400 border border-amber-800 text-[10px] px-2.5 py-1 rounded-full uppercase font-bold tracking-wider">{{ icon('bandage', '12') }} Licença</span>
+                        {% else %}
+                            <span class="inline-flex items-center gap-1 bg-red-900 bg-opacity-30 text-red-500 border border-red-900 text-[10px] px-2.5 py-1 rounded-full uppercase font-bold tracking-wider">{{ icon('x-circle', '12') }} Desativado</span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4 text-center">
+                        <button onclick='abrirPainelInfoCompleto({{ {"id": func.id, "nome": func.nome, "cargo": func.cargo, "usuario": func.usuario, "email": func.email, "data_admissao": func.data_admissao, "status_colaborador": func.status_colaborador, "abas_permitidas": func.abas_permitidas, "maquinas_permitidas": func.maquinas_permitidas} | tojson | safe }})' class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-black py-1.5 px-3 rounded-lg text-xs transition shadow cursor-pointer uppercase tracking-wider">
+                            {{ icon('search', '14') }} Info / Gerenciar
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div id="modalNovoUsuario" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-4xl p-6 overflow-y-auto max-h-[92vh]">
+        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+            <h3 class="text-xl font-bold text-white flex items-center gap-2">{{ icon('user-plus', '24') }} Novo Colaborador</h3>
+            <button type="button" onclick="fecharModal('modalNovoUsuario')" class="text-gray-400 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        
+        <form id="formNovoUsuario" action="/api/usuarios/novo" method="POST" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Nome Completo</label>
+                    <input type="text" name="nome" required class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Cargo</label>
+                    <input type="text" name="cargo" required class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">E-mail Corporativo</label>
+                    <input type="email" name="email" class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Login</label>
+                    <input type="text" name="usuario" required class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Senha Inicial</label>
+                    <input type="text" name="senha" required class="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 pt-4 mt-4">
+                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wide mb-3 flex items-center gap-1">{{ icon('monitor', '14') }} Abas / Módulos Liberados</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-300">
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="producao" class="accent-yellow-500"> {{ icon('factory', '14') }} Produção</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="operacional" class="accent-green-500"> {{ icon('settings', '14') }} Operacional</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="comercial" class="accent-blue-500"> {{ icon('dollar-sign', '14') }} Comercial</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="administracao" class="accent-indigo-600"> {{ icon('bar-chart-2', '14') }} Administração</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="manutencao_ti" class="accent-purple-500"> {{ icon('monitor', '14') }} TI / Suporte</label>
+                    <label class="flex items-center gap-2 bg-gray-900 border border-gray-700 p-2 rounded cursor-pointer hover:border-red-500 transition col-span-3">
+                        <input type="checkbox" name="abas" value="gerencia" class="w-4 h-4 accent-red-600"> <span class="text-xs font-bold text-gray-300 uppercase tracking-wide flex items-center gap-1">{{ icon('crown', '14') }} Gerência (Libera Tudo)</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 pt-4 mt-4">
+                <h4 class="text-xs font-bold text-yellow-400 uppercase tracking-wide mb-3 flex items-center gap-1">{{ icon('wrench', '14') }} Funções e Máquinas Liberadas</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[11px] text-gray-300">
+                    <div id="grupo-novo-operacional" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-green-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('settings', '12') }} Operacional</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="laser" class="accent-green-500"> Laser</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="router" class="accent-green-500"> Router</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="imp_uv" class="accent-green-500"> Impressão UV</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="imp_epson" class="accent-green-500"> Impressão Epson</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="imp_hp" class="accent-green-500"> Impressão HP</label>
+                        </div>
+                    </div>
+                    <div id="grupo-novo-producao" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-yellow-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('factory', '12') }} Produção</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="adesivador" class="accent-yellow-500"> Adesivador</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="ajudante_mesa" class="accent-yellow-500"> Ajudante de Mesa</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="serralheiro" class="accent-yellow-500"> Serralheiro</label>
+                        </div>
+                    </div>
+                    <div id="grupo-novo-comercial" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-blue-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('dollar-sign', '12') }} Comercial</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="vendedor" class="accent-blue-500"> Vendedor</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="designer" class="accent-blue-500"> Designer Gráfico</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="recepcionista" class="accent-blue-500"> Recepcionista</label>
+                        </div>
+                    </div>
+                    <div id="grupo-novo-administracao" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-indigo-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('bar-chart-2', '12') }} Administração</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="rh" class="accent-indigo-500"> Recursos Humanos</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="estoque" class="accent-indigo-500"> Estoque</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="compras" class="accent-indigo-500"> Compras</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="w-full mt-4 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition shadow-lg tracking-widest uppercase">
+                {{ icon('save', '18') }} Concluir Cadastro do Funcionário
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="modalPainelInfoCompleto" class="fixed inset-0 bg-black bg-opacity-85 z-50 flex items-center justify-center hidden p-4 animate-fade-in">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+        
+        <div class="p-4 bg-gray-950 border-b border-gray-800 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-2">
+                <span class="text-xl text-blue-500">{{ icon('contact', '24') }}</span>
+                <div>
+                    <h3 class="text-base font-bold text-white" id="modalInfoNomeTitle">Ficha do Colaborador</h3>
+                    <p class="text-[11px] text-gray-500 uppercase font-mono" id="modalInfoCargoSub">Cargo: ---</p>
+                </div>
+            </div>
+            <button onclick="fecharPainelInfoCompleto()" class="text-gray-400 hover:text-white text-2xl font-bold p-1 leading-none cursor-pointer">&times;</button>
+        </div>
+        
+        <form id="formPainelInfoCompleto" method="POST" action="/api/usuarios/editar" class="p-6 overflow-y-auto space-y-6 flex-1 text-left text-xs">
+            <input type="hidden" name="id_usuario" id="info_id_usuario">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Nome Completo</label><input type="text" name="nome" id="info_nome" required class="w-full bg-black border border-gray-700 rounded p-2 text-white focus:border-blue-500"></div>
+                <div><label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Cargo / Função</label><input type="text" name="cargo" id="info_cargo" required class="w-full bg-black border border-gray-700 rounded p-2 text-white focus:border-blue-500"></div>
+                <div><label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">E-mail Corporativo</label><input type="email" name="email" id="info_email" class="w-full bg-black border border-gray-700 rounded p-2 text-white focus:border-blue-500"></div>
+                <div><label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Login no Sistema</label><input type="text" name="usuario" id="info_usuario_login" required class="w-full bg-black border border-gray-700 rounded p-2 text-white focus:border-blue-500 font-mono"></div>
+                <div><label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Data de Admissão</label><input type="date" name="data_admissao" id="info_data_admissao" class="w-full bg-black border border-gray-700 rounded p-2 text-white focus:border-blue-500 font-mono"></div>
+                <div>
+                    <label class="block text-[10px] uppercase font-bold text-gray-400 mb-1">Status Contratual</label>
+                    <select name="status_colaborador" id="info_status_colaborador" class="w-full bg-black border border-gray-700 rounded p-2 text-white focus:border-blue-500 cursor-pointer">
+                        <option value="Ativo">🟢 Ativo</option><option value="Férias">🏖️ Férias</option><option value="Licença">🩹 Licença / Afastamento</option><option value="Desativado">🚫 Desativado</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 pt-4">
+                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-wide mb-3 flex items-center gap-1">{{ icon('monitor', '14') }} Módulos Liberados (Abas)</h4>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-300">
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="producao" class="accent-yellow-500"> {{ icon('factory', '14') }} Produção</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="operacional" class="accent-green-500"> {{ icon('settings', '14') }} Operacional</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="comercial" class="accent-blue-500"> {{ icon('dollar-sign', '14') }} Comercial</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="administracao" class="accent-indigo-600"> {{ icon('bar-chart-2', '14') }} Administração</label>
+                    <label class="flex items-center gap-2 bg-gray-950 p-2 rounded border border-gray-800 cursor-pointer"><input type="checkbox" name="abas" value="manutencao_ti" class="accent-purple-500"> {{ icon('monitor', '14') }} TI / Suporte</label>
+                    <label class="flex items-center gap-2 bg-gray-900 border border-gray-700 p-2 rounded cursor-pointer hover:border-red-500 transition col-span-3">
+                        <input type="checkbox" name="abas" value="gerencia" class="w-4 h-4 accent-red-600"> <span class="text-xs font-bold text-gray-300 uppercase tracking-wide flex items-center gap-1">{{ icon('crown', '14') }} Gerência</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 pt-4 mt-4">
+                <h4 class="text-xs font-bold text-yellow-400 uppercase tracking-wide mb-3 flex items-center gap-1">{{ icon('wrench', '14') }} Funções e Máquinas Liberadas</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[11px] text-gray-300">
+                    <div id="grupo-editar-operacional" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-green-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('settings', '12') }} Operacional</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="laser" class="accent-green-500"> Laser</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="router" class="accent-green-500"> Router</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="imp_uv" class="accent-green-500"> Imp. UV</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="imp_epson" class="accent-green-500"> Imp. Epson</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="imp_hp" class="accent-green-500"> Imp. HP</label>
+                        </div>
+                    </div>
+                    <div id="grupo-editar-producao" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-yellow-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('factory', '12') }} Produção</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="adesivador" class="accent-yellow-500"> Adesivador</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="ajudante_mesa" class="accent-yellow-500"> Ajudante de Mesa</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="serralheiro" class="accent-yellow-500"> Serralheiro</label>
+                        </div>
+                    </div>
+                    <div id="grupo-editar-comercial" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-blue-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('dollar-sign', '12') }} Comercial</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="vendedor" class="accent-blue-500"> Vendedor</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="designer" class="accent-blue-500"> Designer Gráfico</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="recepcionista" class="accent-blue-500"> Recepcionista</label>
+                        </div>
+                    </div>
+                    <div id="grupo-editar-administracao" class="bg-gray-950 border border-gray-800 p-3 rounded opacity-40 pointer-events-none transition-all">
+                        <p class="text-indigo-400 font-bold uppercase mb-2 border-b border-gray-800 pb-1 flex items-center gap-1">{{ icon('bar-chart-2', '12') }} Administração</p>
+                        <div class="space-y-1.5 flex flex-col">
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="rh" class="accent-indigo-500"> RH</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="estoque" class="accent-indigo-500"> Estoque</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" name="maquinas" value="compras" class="accent-indigo-500"> Compras</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 pt-4 bg-gray-950 p-4 rounded-xl border border-red-950/40">
+                <h4 class="text-xs font-bold text-red-400 uppercase tracking-wide mb-3 flex items-center gap-1">{{ icon('shield-alert', '14') }} Ferramentas de Segurança e Ações Críticas</h4>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" id="btnActionBloquear" onclick="executarAcaoPainel('bloquear')" class="flex items-center gap-1 bg-amber-700 hover:bg-amber-600 text-white font-bold py-1.5 px-3 rounded transition text-xs shadow cursor-pointer">{{ icon('lock', '14') }} Alternar Bloqueio</button>
+                    <button type="button" id="btnActionReset" onclick="executarAcaoPainel('reset')" class="flex items-center gap-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-1.5 px-3 rounded transition text-xs shadow cursor-pointer">{{ icon('mail', '14') }} Disparar Reset</button>
+                    <button type="button" id="btnActionExcluir" onclick="executarAcaoPainel('excluir')" class="flex items-center gap-1 bg-red-700 hover:bg-red-600 text-white font-bold py-1.5 px-3 rounded transition text-xs shadow cursor-pointer">{{ icon('trash-2', '14') }} Excluir Conta</button>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-gray-800 pt-4 shrink-0">
+                <button type="button" onclick="fecharPainelInfoCompleto()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2 px-4 rounded-lg text-xs transition">Fechar</button>
+                <button type="submit" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black py-2 px-6 rounded-lg text-xs transition shadow-lg uppercase tracking-wider">{{ icon('save', '16') }} Gravar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="modalConfirmarBloqueio" class="fixed inset-0 bg-black bg-opacity-80 z-[60] flex items-center justify-center hidden p-4 animate-fade-in">
+    <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col">
+        <div class="p-4 bg-gray-950 border-b border-gray-800 flex justify-between items-center">
+            <h3 class="text-base font-bold text-red-500 flex items-center gap-2">{{ icon('lock', '20') }} Confirmação</h3>
+            <button onclick="fecharModalBloqueio()" class="text-gray-400 hover:text-white text-xl font-bold p-1 cursor-pointer">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-xs text-gray-400">Para validar a operação, confirme a sua <strong>senha de administrador</strong>:</p>
+            <input type="password" id="input-senha-confirmar-bloqueio" placeholder="Sua senha master..." class="w-full bg-black border border-gray-700 rounded p-2.5 text-sm text-white outline-none focus:border-red-500 transition">
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalBloqueio()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2 px-4 rounded text-xs transition">Cancelar</button>
+                <button onclick="executarBloqueioSeguro()" class="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-xs transition shadow">{{ icon('check', '14') }} Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let funcionarioAtivoNoModal = null;
+let idUsuarioParaBloqueio = null;
+
+function abrirModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function fecharModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function sincronizarMaquinas(prefixoModal) {
+    const container = document.getElementById(prefixoModal === 'editar' ? 'formPainelInfoCompleto' : 'formNovoUsuario');
+    const ger = container.querySelector('input[name="abas"][value="gerencia"]').checked;
+    const prod = container.querySelector('input[name="abas"][value="producao"]').checked;
+    const op = container.querySelector('input[name="abas"][value="operacional"]').checked;
+    const com = container.querySelector('input[name="abas"][value="comercial"]').checked;
+    const adm = container.querySelector('input[name="abas"][value="administracao"]').checked;
+
+    const grupos = { 'producao': prod || ger, 'operacional': op || ger, 'comercial': com || ger, 'administracao': adm || ger };
+
+    for (const [grupo, liberado] of Object.entries(grupos)) {
+        const divGrupo = document.getElementById(`grupo-${prefixoModal}-${grupo}`);
+        const checkboxes = divGrupo.querySelectorAll('input[type="checkbox"]');
+        
+        if (liberado) {
+            divGrupo.classList.remove('opacity-40', 'pointer-events-none');
+            if (ger) checkboxes.forEach(c => c.checked = true);
+        } else {
+            divGrupo.classList.add('opacity-40', 'pointer-events-none');
+            checkboxes.forEach(c => c.checked = false);
+        }
+    }
+}
+
+document.querySelectorAll('#formNovoUsuario input[name="abas"]').forEach(i => i.addEventListener('change', () => sincronizarMaquinas('novo')));
+document.querySelectorAll('#formPainelInfoCompleto input[name="abas"]').forEach(i => i.addEventListener('change', () => sincronizarMaquinas('editar')));
+
+function abrirPainelInfoCompleto(func) {
+    funcionarioAtivoNoModal = func;
+    document.getElementById('info_id_usuario').value = func.id;
+    document.getElementById('modalInfoNomeTitle').innerText = func.nome;
+    document.getElementById('modalInfoCargoSub').innerText = `Cargo: ${func.cargo} | Login: ${func.usuario}`;
+    document.getElementById('info_nome').value = func.nome;
+    document.getElementById('info_cargo').value = func.cargo;
+    document.getElementById('info_email').value = func.email || '';
+    document.getElementById('info_usuario_login').value = func.usuario;
+    document.getElementById('info_data_admissao').value = func.data_admissao || '';
+    document.getElementById('info_status_colaborador').value = func.status_colaborador || 'Ativo';
+    
+    const listaAbas = func.abas_permitidas ? func.abas_permitidas.split(',') : [];
+    document.querySelectorAll('#formPainelInfoCompleto input[name="abas"]').forEach(box => { box.checked = listaAbas.includes(box.value); });
+
+    const listaMaquinas = func.maquinas_permitidas ? func.maquinas_permitidas.split(',') : [];
+    document.querySelectorAll('#formPainelInfoCompleto input[name="maquinas"]').forEach(box => { box.checked = listaMaquinas.includes(box.value); });
+
+    sincronizarMaquinas('editar');
+    document.getElementById('modalPainelInfoCompleto').classList.remove('hidden');
+}
+
+function fecharPainelInfoCompleto() { document.getElementById('modalPainelInfoCompleto').classList.add('hidden'); funcionarioAtivoNoModal = null; }
+
+async function executarAcaoPainel(tipo) {
+    if(!funcionarioAtivoNoModal) return;
+    const id = funcionarioAtivoNoModal.id;
+    
+    if (tipo === 'bloquear') {
+        if(id === {{ usuario.id }}) { alert("❌ Segurança: Você não pode desativar o seu próprio usuário."); return; }
+        abrirModalBloqueio(id); 
+    } else if (tipo === 'reset') {
+        if(!confirm("Deseja disparar um link de redefinição de senha para este colaborador?")) return;
+        const fd = new FormData(); fd.append("id_usuario", id);
+        try { const res = await fetch("/api/usuarios/solicitar-reset-senha", { method: "POST", body: fd }); const d = await res.json(); if(d.status === "sucesso") alert("✉️ Link enviado com sucesso!"); else alert("Erro: " + d.mensagem); } catch(e) {}
+    } else if (tipo === 'excluir') {
+        if(id === {{ usuario.id }}) { alert("❌ Operação Negada."); return; }
+        if(!confirm("⚠️ Confirmar exclusão irreversível deste funcionário?")) return;
+        const fd = new FormData(); fd.append("id_usuario", id);
+        try { const res = await fetch("/api/usuarios/excluir", { method: "POST", body: fd }); if((await res.json()).status === "sucesso") window.location.reload(); } catch(e) {}
+    }
+}
+
+function abrirModalBloqueio(idUsuario) { idUsuarioParaBloqueio = idUsuario; document.getElementById('input-senha-confirmar-bloqueio').value = ''; document.getElementById('modalConfirmarBloqueio').classList.remove('hidden'); }
+function fecharModalBloqueio() { document.getElementById('modalConfirmarBloqueio').classList.add('hidden'); idUsuarioParaBloqueio = null; }
+
+async function executarBloqueioSeguro() {
+    const senhaAdmin = document.getElementById('input-senha-confirmar-bloqueio').value.trim();
+    if(!senhaAdmin) { alert("Por favor, informe a senha."); return; }
+    const fd = new FormData(); fd.append("id_usuario", idUsuarioParaBloqueio); fd.append("senha_admin", senhaAdmin);
+    try { const res = await fetch("/api/usuarios/bloquear", { method: "POST", body: fd }); const dados = await res.json(); if (dados.status === "sucesso") window.location.reload(); else alert("❌ " + dados.mensagem); } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const dataAtual = new Date(); const mesAtualStr = String(dataAtual.getMonth() + 1).padStart(2, '0'); const anoAtualStr = String(dataAtual.getFullYear());
+    document.querySelectorAll('.celula-ferias').forEach(celula => {
+        const dataFériasRaw = celula.getAttribute('data-fim-ferias');
+        if(dataFériasRaw && dataFériasRaw.includes('-')) {
+            const partes = dataFériasRaw.split('-');
+            if (partes[1] === mesAtualStr && partes[0] === anoAtualStr) {
+                celula.innerHTML = `<div class="bg-red-950 border border-red-600 text-red-400 p-1.5 rounded animate-pulse flex flex-col gap-0.5 font-bold"><span class="flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> VENCE ESTE MÊS</span><span class="text-[10px] font-mono font-medium">Data: ${partes[2]}/${partes[1]}/${partes[0]}</span></div>`;
+                lucide.createIcons();
+            } else { celula.innerText = `${partes[2]}/${partes[1]}/${partes[0]}`; }
+        }
+    });
+    document.querySelectorAll('td[data-admissao]').forEach(celula => {
+        const admRaw = celula.getAttribute('data-admissao');
+        if(admRaw && admRaw.includes('-')) {
+            const dataAdm = new Date(admRaw + 'T00:00:00');
+            let diffAnos = dataAtual.getFullYear() - dataAdm.getFullYear(); let diffMeses = dataAtual.getMonth() - dataAdm.getMonth();
+            if (diffMeses < 0) { diffAnos--; diffMeses += 12; }
+            if (diffAnos === 0 && diffMeses === 0) { celula.innerHTML = `<span class="flex items-center gap-1 text-emerald-400 font-bold"><i data-lucide="sparkles" class="w-3 h-3"></i> Recém-admitido</span>`; lucide.createIcons(); } 
+            else { let textoAno = diffAnos > 0 ? `${diffAnos} ano${diffAnos > 1 ? 's' : ''}` : ''; let textoMes = diffMeses > 0 ? `${diffMeses} mê${diffMeses > 1 ? 'ses' : 's'}` : ''; celula.innerText = [textoAno, textoMes].filter(Boolean).join(' e '); }
+        }
+    });
+});
+</script>
+{% endblock %}

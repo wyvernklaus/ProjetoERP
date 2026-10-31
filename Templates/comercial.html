@@ -1,0 +1,611 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Comercial - ERP{% endblock %}
+{% block content %}
+<!-- DADOS INJETADOS DO SERVIDOR (Formato invisível para o VSCode e Navegador) -->
+<script id="dados-clientes" type="application/json">{{ clientes_formatados | tojson | safe }}</script>
+<script id="dados-catalogo" type="application/json">{{ catalogo_js | safe if catalogo_js else '[]' }}</script>
+
+<header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-800 pb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-blue-400 flex items-center gap-3">
+            {{ icon('dollar-sign', '32') }} Painel Comercial
+        </h1>
+        <p class="text-gray-400 mt-1">Emissão de O.S., CRM de Clientes e Verificação de Estoque.</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <button onclick="document.getElementById('modalNovoCliente').classList.remove('hidden')" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg uppercase text-xs tracking-wider transition shadow">
+            {{ icon('user-plus', '16') }} Novo Cliente
+        </button>
+        <a href="/historico-geral" class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-2 px-4 rounded-lg uppercase text-xs tracking-wider transition shadow border border-gray-700">
+            {{ icon('archive', '16') }} Histórico
+        </a>
+        <button onclick="document.getElementById('modalNovaOS').classList.remove('hidden')" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-lg uppercase text-xs tracking-wider transition shadow">
+            {{ icon('plus-circle', '16') }} Gerar Nova O.S.
+        </button>
+    </div>
+</header>
+
+<div class="bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden mb-10">
+    <div class="p-4 bg-gray-950 border-b border-gray-800">
+        <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wide flex items-center gap-2">
+            {{ icon('clipboard-list', '18') }} Acompanhamento de O.S. Ativas
+        </h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+            <thead>
+                <tr class="bg-gray-950 text-xs uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                    <th class="p-4">Nº</th>
+                    <th class="p-4">Cliente / Prazo</th>
+                    <th class="p-4">Serviços e Setores</th>
+                    <th class="p-4 text-center">Status</th>
+                    <th class="p-4 text-center">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">
+                {% for os in os_andamento %}
+                <tr class="hover:bg-gray-800 transition text-gray-300 group">
+                    <td class="p-4 font-bold text-blue-400">#{{ os.numero_os }}</td>
+                    <td class="p-4">
+                        <span class="block text-white font-medium">{{ os.cliente }}</span>
+                        <span class="text-[10px] text-gray-500">{{ os.empresa if os.empresa else 'Avulso' }}</span>
+                    </td>
+                    <td class="p-4">
+                        <p class="font-bold text-yellow-500 text-xs">{{ os.servicos if os.servicos else 'Serviços Diversos' }}</p>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="text-gray-400 font-bold text-[10px] uppercase border border-gray-600 bg-gray-900 px-2 py-0.5 rounded">{{ os.status }}</span>
+                    </td>
+                    <td class="p-4 flex items-center justify-center gap-2">
+                        <a href="/os/{{ os.id }}/imprimir" target="_blank" class="flex items-center gap-1 bg-indigo-700 hover:bg-indigo-600 text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase transition border border-indigo-600 shadow">
+                            {{ icon('file-text', '14') }} PDF
+                        </a>
+                        <form action="/api/comercial/excluir-os" method="POST" onsubmit="return confirm('⚠️ ATENÇÃO: Deseja DELETAR esta O.S.?');">
+                            <input type="hidden" name="id_os" value="{{ os.id }}">
+                            <button type="submit" class="flex items-center justify-center bg-red-900 hover:bg-red-700 text-white font-bold py-1.5 px-2 rounded text-[10px] uppercase transition border border-red-800 opacity-0 group-hover:opacity-100" title="Excluir O.S.">
+                                {{ icon('trash-2', '14') }}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="p-8 text-center text-gray-500">Nenhuma O.S. ativa no momento.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL GIGANTE: GERAR NOVA O.S. -->
+<div id="modalNovaOS" class="hidden fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-2 sm:p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-[95vw] p-4 sm:p-6 overflow-y-auto max-h-[95vh] custom-scrollbar flex flex-col">
+        
+        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+            <h3 class="text-xl font-bold text-blue-400 flex items-center gap-2">
+                {{ icon('rocket', '24') }} EMITIR O.S.
+            </h3>
+            <button type="button" onclick="fecharModalOS()" class="text-gray-400 hover:text-red-500 text-3xl font-light transition">&times;</button>
+        </div>
+        
+        <form action="/api/comercial/nova-os" method="POST" id="formNovaOS" class="flex-1 flex flex-col">
+            
+            <input type="hidden" name="cliente" id="hidden_nome_cliente">
+            <input type="hidden" name="empresa" id="hidden_nome_empresa">
+            <input type="hidden" name="detalhes" id="hidden_detalhes_finais">
+            <input type="hidden" id="hidden_id_cliente">
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="relative">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">PESSOA RESPONSÁVEL (BUSQUE)</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-2.5 text-gray-500">
+                            {{ icon('search', '16') }}
+                        </span>
+                        <input type="text" id="input_busca_cliente" oninput="filtrarClientesAoVivo()" onkeydown="travarEnter(event)" autocomplete="off" placeholder="Digite o nome..." class="w-full bg-black border border-gray-700 rounded p-2.5 pl-9 text-white text-xs focus:border-blue-500 outline-none">
+                    </div>
+                    <div id="dropdown_clientes" class="absolute z-50 w-full bg-gray-800 border border-gray-600 mt-1 rounded-lg shadow-2xl max-h-48 overflow-y-auto custom-scrollbar hidden"></div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">EMPRESA VINCULADA</label>
+                    <input type="text" id="display_empresa" readonly placeholder="Aguardando seleção..." class="w-full bg-black border border-gray-800 rounded p-2.5 text-gray-500 text-xs outline-none cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SETOR / UNIDADE</label>
+                    <input type="text" id="display_setor" readonly placeholder="Aguardando seleção..." class="w-full bg-black border border-gray-800 rounded p-2.5 text-gray-500 text-xs outline-none cursor-not-allowed">
+                </div>
+            </div>
+
+            <!-- BUSCA INTELIGENTE DO CATÁLOGO -->
+            <div class="mb-6 bg-blue-900 bg-opacity-20 border border-blue-800 p-3 rounded-lg relative">
+                <label class="block text-[10px] font-black text-blue-400 uppercase mb-2 flex items-center gap-1">
+                    {{ icon('search', '14') }} BUSCAR PADRÃO DE SERVIÇO (CATÁLOGO)
+                </label>
+                <input type="text" id="input_busca_padrao" onkeydown="travarEnter(event)" autocomplete="off" placeholder="Ex: Digite 'adesivo', 'quadro', 'fachada' e selecione para adicionar à tabela abaixo..." class="w-full bg-black border border-blue-700 rounded p-2.5 text-white text-xs focus:border-blue-400 outline-none shadow-inner transition">
+                <ul id="dropdown_resultados" class="hidden absolute z-50 w-full bg-gray-800 border border-gray-600 mt-1 rounded-lg shadow-2xl max-h-48 overflow-y-auto custom-scrollbar divide-y divide-gray-700"></ul>
+            </div>
+
+            <!-- TABELA DINÂMICA DE DETALHAMENTO -->
+            <div class="border border-gray-700 rounded-lg bg-gray-900 mb-6 overflow-hidden">
+                <div class="flex justify-between items-center p-3 border-b border-gray-700 bg-gray-950">
+                    <h4 class="font-bold text-sm text-gray-300 flex items-center gap-2">
+                        {{ icon('shopping-cart', '18') }} DETALHAMENTO DOS SERVIÇOS E MATERIAIS
+                    </h4>
+                    <button type="button" onclick="adicionarLinhaServico()" class="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase transition shadow">
+                        {{ icon('plus', '14') }} ADICIONAR LINHA MANUAL
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left min-w-[800px]">
+                        <thead>
+                            <tr class="bg-black text-[9px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                                <th class="p-3 w-1/4">REFERÊNCIA / LOCAL E QTD</th>
+                                <th class="p-3 w-1/3">PRODUTO E COMPOSIÇÃO DE MATERIAIS</th>
+                                <th class="p-3 w-1/3">OBSERVAÇÕES PARA FÁBRICA</th>
+                                <th class="p-3 text-center">{{ icon('trash-2', '14') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpo_tabela_servicos" class="divide-y divide-gray-800"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">OBSERVAÇÕES GERAIS DA O.S.</label>
+                    <textarea id="obs_gerais" rows="3" class="w-full bg-black border border-gray-700 rounded p-3 text-gray-300 text-xs font-sans outline-none focus:border-blue-500 update-trigger" placeholder="Anotações gerais que não pertencem a um item específico..."></textarea>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">ENDEREÇO DE INSTALAÇÃO (OU RETIRADA)</label>
+                        <input type="text" name="endereco" id="input_endereco_os" class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-xs focus:border-blue-500 outline-none update-trigger">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">VALOR TOTAL (R$)</label>
+                            <input type="number" step="0.01" name="valor_total" id="input_valor_os" placeholder="0.00" class="w-full bg-black border border-gray-700 rounded p-2.5 text-green-400 font-bold text-sm focus:border-blue-500 outline-none update-trigger">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">PRAZO ACORDADO</label>
+                            <input type="date" id="input_prazo" class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-xs focus:border-blue-500 outline-none update-trigger">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-6 bg-gray-950 border border-gray-800 rounded-lg p-3">
+                <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="urgente" value="true" class="w-4 h-4 accent-red-600">
+                    <span class="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-1">
+                        {{ icon('alert-triangle', '14') }} Marcar esta O.S. como URGENTE
+                    </span>
+                </label>
+            </div>
+
+            <div class="border border-indigo-900 bg-indigo-900 bg-opacity-10 rounded-xl p-4 mb-6 shadow-inner">
+                <h4 class="text-xs font-black text-indigo-400 uppercase tracking-widest border-b border-indigo-900 pb-2 mb-3 flex items-center gap-2">
+                    {{ icon('eye', '16') }} Pré-visualização da O.S. (Como a fábrica vai ver)
+                </h4>
+                <div id="content_preview_os" class="bg-black p-4 rounded border border-gray-800 min-h-[100px] text-gray-400 text-sm">
+                    Preencha a tabela acima para gerar a pré-visualização.
+                </div>
+            </div>
+
+            <div class="mt-auto pt-4 border-t border-gray-800">
+                <input type="hidden" name="salvar_padrao" id="input_salvar_padrao" value="false">
+                <input type="hidden" name="nome_padrao" id="input_nome_padrao" value="">
+                <input type="hidden" name="setores_padrao" id="input_setores_padrao" value="">
+                <input type="hidden" name="materiais_padrao" id="input_materiais_padrao" value="">
+                <input type="hidden" id="ignorar_pergunta" value="false">
+
+                <button type="submit" onclick="return empacotarDadosOS(event)" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl text-sm uppercase tracking-widest transition shadow-[0_0_20px_rgba(37,99,235,0.4)]">
+                    {{ icon('send', '20') }} Fechar Pedido e Enviar O.S.
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL CÉREBRO -->
+<div id="modalAprenderPadrao" class="hidden fixed inset-0 bg-black bg-opacity-95 z-[80] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border-2 border-blue-600 rounded-2xl shadow-[0_0_30px_rgba(37,99,235,0.3)] w-full max-w-lg p-6">
+        <div class="text-center mb-6">
+            <div class="flex justify-center mb-2 text-blue-500 animate-pulse">
+                {{ icon('brain', '64') }}
+            </div>
+            <h3 class="font-black text-xl text-blue-400 uppercase tracking-widest">Produto Novo Detectado</h3>
+            <p class="text-xs text-gray-400 mt-2">Deseja salvar a estrutura desta O.S. no catálogo de Serviços para facilitar na próxima vez?</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome do Padrão</label>
+                <input type="text" id="novo_nome_padrao" placeholder="Ex: Letreiro Inox com Led" class="w-full bg-black border border-gray-700 rounded p-3 text-white text-sm outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Setores Exigidos</label>
+                <div class="grid grid-cols-2 gap-2 bg-black border border-gray-700 p-3 rounded text-xs text-gray-300">
+                    <label class="flex items-center gap-2"><input type="checkbox" class="check-setor" value="operacional"> {{ icon('settings', '14') }} CNC / Impressão</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="check-setor" value="producao"> {{ icon('factory', '14') }} Montagem</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="check-setor" value="instalacao"> {{ icon('truck', '14') }} Instalação</label>
+                    <label class="flex items-center gap-2"><input type="checkbox" class="check-setor" value="terceirizado"> {{ icon('handshake', '14') }} Terceirizado</label>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+            <button type="button" onclick="pularEgerarOS()" class="w-1/2 bg-gray-800 text-gray-400 font-bold py-3 rounded text-xs uppercase transition">Não, Só Enviar</button>
+            <button type="button" onclick="aprenderEgerarOS()" class="w-1/2 flex items-center justify-center gap-2 bg-blue-600 text-white font-black py-3 rounded text-xs uppercase shadow">
+                {{ icon('save', '16') }} Salvar no Catálogo
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL NOVO CLIENTE -->
+<div id="modalNovoCliente" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-md p-6">
+        <div class="flex justify-between items-center mb-6 border-b border-gray-800 pb-3">
+            <h3 class="font-bold text-lg text-emerald-400 flex items-center gap-2">{{ icon('user-plus', '20') }} Novo Cliente</h3>
+            <button onclick="document.getElementById('modalNovoCliente').classList.add('hidden')" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+        <form id="formNovoCliente" class="space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome do Responsável</label>
+                <input type="text" name="nome" id="novo_cli_nome" required placeholder="Ex: João Silva" class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Empresa (Opcional)</label>
+                <input type="text" name="empresa" id="novo_cli_empresa" placeholder="Ex: Gráfica ABC" class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Telefone</label>
+                <input type="text" name="telefone" id="novo_cli_telefone" placeholder="(21) 99999-9999" class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Endereço Padrão</label>
+                <input type="text" name="endereco" id="novo_cli_endereco" placeholder="Rua, Número, Bairro..." class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Setor / Unidade</label>
+                <input type="text" name="setor_unidade" id="novo_cli_setor" placeholder="Ex: Matriz, Filial..." class="w-full bg-black border border-gray-700 rounded p-2.5 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+            <button type="button" onclick="salvarNovoClienteAjax()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg text-sm uppercase transition shadow mt-4 flex items-center justify-center gap-2">
+                {{ icon('save', '18') }} Cadastrar Cliente
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. DADOS INJETADOS
+    // ==========================================
+    var clientesBD = JSON.parse(document.getElementById('dados-clientes').textContent);
+    var catalogoBD_python = JSON.parse(document.getElementById('dados-catalogo').textContent);
+    
+    var catalogoServicos = [
+        { titulo: "Adesivo de Recorte Simples", texto: "[SETOR CNC]\n- Corte Eletrônico\n- Depilado com máscara." },
+        { titulo: "Adesivo Branco Impresso UV", texto: "[SETOR IMPRESSÃO]\n- Tinta Padrão CMYK\n- Refile Reto." },
+        { titulo: "Quadro PVC 2mm (Informativo)", texto: "[SETOR CNC]\n- PVC 2mm\n- Bolsos Acrílico Cristal\n[IMPRESSÃO]\n- UV Direta no PVC\n[MONTAGEM]\n- Fita VHB no verso." },
+        { titulo: "Letreiro Acrílico 5mm Espelhado", texto: "[SETOR CNC]\n- Acrílico Cast 5mm\n[IMPRESSÃO]\n- UV Espelhada pelo verso + Branco\n[MONTAGEM]\n- Gabarito de instalação de papel." }
+    ];
+
+    var usouPadraoDoCatalogo = false;
+    var linhaCount = 0;
+
+    function travarEnter(event) {
+        if (event.key === 'Enter') { event.preventDefault(); return false; }
+    }
+
+    // ==========================================
+    // 2. BUSCA E CADASTRO DE CLIENTES
+    // ==========================================
+    function filtrarClientesAoVivo() {
+        var input = document.getElementById('input_busca_cliente').value.toLowerCase();
+        var dropdown = document.getElementById('dropdown_clientes');
+        dropdown.innerHTML = ''; 
+
+        if (input.length < 1) { dropdown.classList.add('hidden'); return; }
+
+        var resultados = clientesBD.filter(c => c.nome.toLowerCase().includes(input) || (c.empresa && c.empresa.toLowerCase().includes(input)));
+
+        if (resultados.length > 0) {
+            resultados.forEach(c => {
+                var div = document.createElement('div');
+                div.className = "p-3 hover:bg-blue-900 cursor-pointer transition flex flex-col border-b border-gray-700 last:border-0";
+                div.onclick = () => selecionarCliente(c.id, c.nome, c.empresa, c.setor, c.endereco);
+                
+                // Concatenação em vez de template literals
+                div.innerHTML = '<span class="font-bold text-white text-sm">' + c.nome + '</span>' +
+                                '<span class="text-[10px] text-gray-400 uppercase mt-1 flex items-center gap-1"><i data-lucide="building-2" class="w-3 h-3"></i> ' + (c.empresa || 'Particular') + '</span>';
+                
+                dropdown.appendChild(div);
+            });
+        } else {
+            dropdown.innerHTML = '<div class="p-3 text-xs text-gray-500 italic text-center">Cliente não encontrado. Escreva o nome para cadastrar avulso.</div>';
+        }
+        dropdown.classList.remove('hidden');
+    }
+
+    function selecionarCliente(id, nome, empresa, setor, endereco) {
+        document.getElementById('hidden_id_cliente').value = id;
+        document.getElementById('input_busca_cliente').value = nome;
+        document.getElementById('display_empresa').value = empresa || "Particular / Avulso";
+        document.getElementById('display_setor').value = setor || "N/A";
+        var inEnd = document.getElementById('input_endereco_os');
+        if(inEnd) inEnd.value = endereco || "";
+        document.getElementById('dropdown_clientes').classList.add('hidden');
+    }
+
+    async function salvarNovoClienteAjax() {
+        const nome = document.getElementById('novo_cli_nome').value.trim();
+        if (!nome) { alert("Digite o nome do cliente!"); return; }
+
+        const formData = new FormData();
+        formData.append("nome", nome);
+        formData.append("empresa_id", 0); 
+        formData.append("setor_unidade", document.getElementById('novo_cli_setor').value.trim());
+        formData.append("telefone", document.getElementById('novo_cli_telefone').value.trim());
+        formData.append("endereco", document.getElementById('novo_cli_endereco').value.trim());
+        
+        try {
+            const res = await fetch('/api/comercial/ajax-novo-cliente', { method: 'POST', body: formData });
+            const data = await res.json();
+            
+            if (data.status === 'sucesso') {
+                clientesBD.push(data.cliente);
+                
+                document.getElementById('formNovoCliente').reset();
+                document.getElementById('modalNovoCliente').classList.add('hidden');
+                
+                document.getElementById('input_busca_cliente').value = data.cliente.nome;
+                document.getElementById('hidden_id_cliente').value = data.cliente.id;
+                document.getElementById('display_empresa').value = data.cliente.empresa || 'Particular / Avulso';
+                document.getElementById('display_setor').value = data.cliente.setor || 'N/A';
+                var inEnd = document.getElementById('input_endereco_os');
+                if(inEnd) inEnd.value = data.cliente.endereco || '';
+                
+                alert("✅ Cliente cadastrado com sucesso!");
+            } else {
+                alert("Erro ao cadastrar cliente.");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Erro de comunicação com o servidor.");
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        var dc = document.getElementById('dropdown_clientes');
+        if(e.target !== document.getElementById('input_busca_cliente') && dc) dc.classList.add('hidden');
+        var dr = document.getElementById('dropdown_resultados');
+        var ib = document.getElementById('input_busca_padrao');
+        if(e.target !== ib && dr) dr.classList.add('hidden');
+    });
+
+    // ==========================================
+    // 3. BUSCA DO CATÁLOGO
+    // ==========================================
+    var inputBuscaPadrao = document.getElementById('input_busca_padrao');
+    var dropdownResultados = document.getElementById('dropdown_resultados');
+
+    if (inputBuscaPadrao) {
+        inputBuscaPadrao.addEventListener('input', function() {
+            var termo = this.value.toLowerCase().trim();
+            dropdownResultados.innerHTML = ''; 
+            if (termo.length < 2) { dropdownResultados.classList.add('hidden'); return; }
+
+            var todosPadroes = [...catalogoServicos];
+            catalogoBD_python.forEach(bd => {
+                if(!todosPadroes.find(p => p.titulo === bd.nome)) {
+                    todosPadroes.push({ titulo: bd.nome, texto: "Instruções salvas pelo sistema..." });
+                }
+            });
+
+            var resultados = todosPadroes.filter(item => item.titulo.toLowerCase().includes(termo));
+
+            if (resultados.length > 0) {
+                dropdownResultados.classList.remove('hidden');
+                resultados.forEach(item => {
+                    var li = document.createElement('li');
+                    li.className = "p-3 hover:bg-blue-900 hover:text-white text-gray-300 text-xs font-bold cursor-pointer transition flex items-center gap-2";
+                    li.innerHTML = '<i data-lucide="plus" class="w-4 h-4"></i> ' + item.titulo;
+                    li.addEventListener('click', function() {
+                        adicionarLinhaServico(item.titulo, item.texto);
+                        inputBuscaPadrao.value = '';
+                        dropdownResultados.classList.add('hidden');
+                        usouPadraoDoCatalogo = true; 
+                    });
+                    dropdownResultados.appendChild(li);
+                });
+                lucide.createIcons();
+            } else {
+                dropdownResultados.classList.remove('hidden');
+                dropdownResultados.innerHTML = '<li class="p-3 text-gray-500 text-xs italic">Nada encontrado no catálogo. Adicione a linha manualmente.</li>';
+            }
+        });
+    }
+
+    // ==========================================
+    // 4. TABELA DINÂMICA (Sem template literals)
+    // ==========================================
+    function adicionarLinhaServico(padraoTitulo = '', padraoTexto = '') {
+        linhaCount++; 
+        var id = linhaCount; 
+        var tbody = document.getElementById('corpo_tabela_servicos');
+        var tr = document.createElement('tr'); 
+        tr.id = 'linha_' + id; 
+        tr.className = "bg-gray-900 border-b border-gray-800 transition hover:bg-gray-800";
+        
+        var trHtml = '<td class="p-3 align-top border-r border-gray-800">' +
+            '<input type="text" id="ref_' + id + '" placeholder="Ex: Parede 01" class="w-full bg-black border border-gray-700 rounded p-2 text-white text-xs outline-none focus:border-blue-500 update-trigger">' +
+            '<div class="mt-2 flex items-center gap-2">' +
+            '<span class="text-[9px] text-gray-500 uppercase font-bold">QTD:</span>' +
+            '<input type="number" id="qtd_prod_' + id + '" value="1" min="1" class="w-16 bg-black border border-gray-700 rounded p-1.5 text-white text-center text-xs font-bold outline-none focus:border-blue-500 update-trigger">' +
+            '</div></td>' +
+            
+            '<td class="p-3 align-top border-r border-gray-800">' +
+            '<input type="text" id="produto_' + id + '" placeholder="Produto Principal" value="' + padraoTitulo + '" class="w-full bg-blue-900 bg-opacity-20 border border-blue-800 rounded p-2 text-blue-300 font-bold text-xs mb-2 update-trigger">' +
+            '<div class="bg-gray-950 p-2 rounded border border-gray-800">' +
+            '<div id="materiais_linha_' + id + '" class="space-y-1"></div>' +
+            '<button type="button" onclick="adicionarMaterial(' + id + ')" class="mt-2 flex items-center justify-center gap-1 text-[9px] bg-gray-900 hover:bg-gray-800 text-gray-400 px-2 py-1.5 rounded border border-gray-700 w-full transition font-bold tracking-widest"><i data-lucide="plus" class="w-3 h-3"></i> INSUMO</button>' +
+            '</div></td>' +
+            
+            '<td class="p-3 align-top">' +
+            '<textarea id="obs_linha_' + id + '" rows="4" placeholder="Instruções para os setores de corte, impressão, etc..." class="w-full bg-black border border-gray-700 rounded p-2 text-[10px] text-gray-300 font-mono outline-none focus:border-blue-500 update-trigger">' + padraoTexto + '</textarea>' +
+            '</td>' +
+            
+            '<td class="p-3 align-middle text-center border-l border-gray-800">' +
+            '<button type="button" onclick="document.getElementById(\'linha_' + id + '\').remove(); atualizarPreview();" class="text-gray-500 hover:text-red-500 hover:bg-red-900 hover:bg-opacity-30 p-2 rounded transition text-lg"><i data-lucide="x" class="w-4 h-4"></i></button>' +
+            '</td>';
+
+        tr.innerHTML = trHtml;
+        tbody.appendChild(tr); 
+        
+        if(!padraoTitulo) adicionarMaterial(id); 
+        
+        tr.querySelectorAll('.update-trigger').forEach(el => el.addEventListener('input', atualizarPreview));
+        lucide.createIcons();
+        atualizarPreview();
+    }
+
+    function adicionarMaterial(idLinha) {
+        var div = document.createElement('div'); 
+        div.className = "flex gap-1 items-center class-material group/mat";
+        
+        var matHtml = '<input type="text" placeholder="Material" class="input-nome-mat flex-1 bg-black border border-gray-700 rounded p-1.5 text-white text-[10px] update-trigger">' +
+            '<input type="text" placeholder="Medida" class="input-medida-mat w-16 bg-black border border-gray-700 rounded p-1.5 text-white text-center text-[10px] update-trigger">' +
+            '<input type="number" value="1" min="1" class="input-qtd-mat w-10 bg-black border border-gray-700 rounded p-1.5 text-white text-center text-[10px] update-trigger">' +
+            '<button type="button" onclick="this.parentElement.remove(); atualizarPreview();" class="w-5 text-center text-gray-600 hover:text-red-500 font-bold transition"><i data-lucide="x" class="w-3 h-3"></i></button>';
+            
+        div.innerHTML = matHtml;
+        document.getElementById('materiais_linha_' + idLinha).appendChild(div);
+        div.querySelectorAll('.update-trigger').forEach(el => el.addEventListener('input', atualizarPreview));
+        lucide.createIcons();
+    }
+
+    setTimeout(() => {
+        var tbody = document.getElementById('corpo_tabela_servicos');
+        if (tbody && tbody.innerHTML.trim() === '') {
+            adicionarLinhaServico();
+        }
+    }, 100);
+
+    var obsGerais = document.getElementById('obs_gerais');
+    if (obsGerais) obsGerais.addEventListener('input', atualizarPreview);
+    var inPrazo = document.getElementById('input_prazo');
+    if (inPrazo) inPrazo.addEventListener('input', atualizarPreview);
+    var inEnder = document.getElementById('input_endereco_os');
+    if (inEnder) inEnder.addEventListener('input', atualizarPreview);
+
+    // ==========================================
+    // 5. PREVIEW AO VIVO (Sem template literals)
+    // ==========================================
+    function atualizarPreview() {
+        var html = "";
+        var linhas = document.querySelectorAll('#corpo_tabela_servicos tr');
+        
+        var campoPrazo = document.getElementById('input_prazo');
+        var campoEnd = document.getElementById('input_endereco_os');
+        var prazo = campoPrazo ? campoPrazo.value : '';
+        var ender = campoEnd ? campoEnd.value : '';
+        
+        if(prazo || ender) {
+            html += '<div class="mb-4 bg-black p-3 rounded border border-gray-800 text-xs">';
+            if(prazo) html += '<p class="text-emerald-400 font-bold uppercase flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> Prazo: ' + prazo.split('-').reverse().join('/') + '</p>';
+            if(ender) html += '<p class="text-gray-400 mt-1 uppercase flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3"></i> Local: ' + ender + '</p>';
+            html += '</div>';
+        }
+
+        linhas.forEach((tr, index) => {
+            var id = tr.id.split('_')[1];
+            var refEl = document.getElementById('ref_' + id);
+            var prodEl = document.getElementById('produto_' + id);
+            var qtdEl = document.getElementById('qtd_prod_' + id);
+            var obsEl = document.getElementById('obs_linha_' + id);
+            
+            if(!refEl || !prodEl) return;
+            
+            var ref = refEl.value || 'Sem Referência';
+            var qtd = qtdEl ? qtdEl.value : '1';
+            var prod = prodEl.value || 'Item não especificado';
+            var obs = obsEl ? obsEl.value : '';
+            
+            html += '<div class="mb-4 pb-4 border-b border-gray-800 last:border-0">';
+            html += '<h5 class="text-blue-400 font-bold text-sm uppercase flex items-center gap-1"><i data-lucide="shopping-bag" class="w-4 h-4"></i> Item ' + (index + 1) + ': ' + prod + ' <span class="text-gray-500 text-xs">(Qtd: ' + qtd + 'x)</span></h5>';
+            html += '<p class="text-[10px] text-gray-400 uppercase mb-2 mt-1 flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3"></i> Referência: ' + ref + '</p>';
+            
+            var mats = "";
+            tr.querySelectorAll('.class-material').forEach(mat => {
+                var n = mat.querySelector('.input-nome-mat').value;
+                var m = mat.querySelector('.input-medida-mat').value;
+                var q = mat.querySelector('.input-qtd-mat').value;
+                if(n) mats += '<li class="text-xs text-gray-300 ml-4 list-disc">' + n + ' ' + (m ? '('+m+')' : '') + ' - <strong class="text-amber-500">' + q + ' un.</strong></li>';
+            });
+            if(mats) html += '<div class="mb-2"><strong class="text-[10px] text-gray-500 uppercase">Composição:</strong><ul>' + mats + '</ul></div>';
+            
+            if(obs) html += '<div class="bg-gray-900 bg-opacity-50 p-2 rounded border border-gray-800 text-[11px] text-gray-300 font-mono whitespace-pre-wrap mt-2">' + obs + '</div>';
+            html += '</div>';
+        });
+
+        var campoObs = document.getElementById('obs_gerais');
+        var txtObs = campoObs ? campoObs.value : '';
+        if(txtObs) {
+            html += '<div class="mt-4 p-3 bg-yellow-900 bg-opacity-10 border border-yellow-800 rounded">' +
+                        '<strong class="text-xs text-yellow-500 uppercase block mb-1 flex items-center gap-1"><i data-lucide="alert-circle" class="w-4 h-4"></i> Observações Gerais:</strong>' +
+                        '<p class="text-xs text-gray-300 whitespace-pre-wrap">' + txtObs + '</p>' +
+                     '</div>';
+        }
+
+        if(html === "") html = "<p class='text-gray-600 text-xs italic'>Preencha a tabela para visualizar...</p>";
+        var cp = document.getElementById('content_preview_os');
+        if(cp) cp.innerHTML = html;
+        var hd = document.getElementById('hidden_detalhes_finais');
+        if(hd) hd.value = html;
+        lucide.createIcons();
+    }
+
+    // ==========================================
+    // 6. FECHAMENTO DE PEDIDO
+    // ==========================================
+    function empacotarDadosOS(event) {
+        var nomeDigitado = document.getElementById('input_busca_cliente').value.trim();
+        if(!nomeDigitado) { alert("⚠️ Digite ou Selecione um Cliente!"); event.preventDefault(); return false; }
+        
+        document.getElementById('hidden_nome_cliente').value = nomeDigitado;
+        document.getElementById('hidden_nome_empresa').value = document.getElementById('display_empresa').value || "";
+        
+        atualizarPreview(); 
+
+        var ignorar = document.getElementById('ignorar_pergunta').value;
+        if (!usouPadraoDoCatalogo && ignorar === "false") {
+            event.preventDefault(); 
+            document.getElementById('modalAprenderPadrao').classList.remove('hidden'); 
+            return false;
+        }
+        
+        return true; 
+    }
+
+    function fecharModalOS() {
+        document.getElementById('modalNovaOS').classList.add('hidden');
+        document.getElementById('formNovaOS').reset();
+        document.getElementById('corpo_tabela_servicos').innerHTML = '';
+        linhaCount = 0; adicionarLinhaServico(); 
+        document.getElementById('content_preview_os').innerHTML = '';
+    }
+
+    function pularEgerarOS() {
+        document.getElementById('ignorar_pergunta').value = "true";
+        document.getElementById('formNovaOS').submit(); 
+    }
+
+    function aprenderEgerarOS() {
+        var nome = document.getElementById('novo_nome_padrao').value.trim();
+        if (!nome) { alert("Dê um nome para este padrão de serviço!"); return; }
+        document.getElementById('input_salvar_padrao').value = "true";
+        document.getElementById('input_nome_padrao').value = nome;
+        document.getElementById('ignorar_pergunta').value = "true";
+        document.getElementById('formNovaOS').submit();
+    }
+</script>
+{% endblock %}

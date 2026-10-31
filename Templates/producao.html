@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Produção - ERP{% endblock %}
+{% block content %}
+
+<header class="mb-6 border-b border-gray-800 pb-4 flex items-center gap-3">
+    <div class="p-3 bg-amber-500 bg-opacity-10 rounded-xl text-amber-500 border border-amber-500 border-opacity-20 shadow-[0_0_15px_rgba(245,158,11,0.15)]">
+        {{ icon('factory', '32') }}
+    </div>
+    <div>
+        <h1 class="text-3xl font-black text-amber-500 flex items-center gap-2">Chão de Fábrica</h1>
+        <p class="text-gray-400 text-sm mt-1 uppercase font-bold tracking-widest">Montagem • Acabamento • Expedição</p>
+    </div>
+</header>
+
+<div class="flex gap-2 bg-gray-900 p-1 rounded-xl border border-gray-800 mb-6 overflow-x-auto custom-scrollbar">
+    <button onclick="mudarAba('aba_os', this)" class="tab-btn flex items-center gap-2 bg-amber-600 text-white font-bold py-2 px-6 rounded-lg text-xs uppercase whitespace-nowrap shadow transition">
+        {{ icon('clipboard-list', '16') }} Fila de Montagem
+    </button>
+    <button onclick="mudarAba('aba_entregues', this)" class="tab-btn flex items-center gap-2 bg-transparent hover:bg-gray-800 text-gray-400 font-bold py-2 px-6 rounded-lg text-xs uppercase whitespace-nowrap transition">
+        {{ icon('check-circle', '16') }} Enviados p/ Instalação
+    </button>
+</div>
+
+<div id="aba_os" class="aba-conteudo animate-fade-in">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for os in os_ativas %}
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-xl flex flex-col overflow-hidden">
+            <div class="p-4 bg-gray-900 border-b border-gray-700">
+                <div class="flex justify-between">
+                    <h4 class="font-black text-xl text-white">OS #{{ os.numero_os }}</h4>
+                    {% if os.urgente %}
+                    <span class="flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded bg-red-900 text-red-300 border border-red-700 animate-pulse">
+                        {{ icon('alert-triangle', '12') }} URGENTE
+                    </span>
+                    {% else %}
+                    <span class="flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded bg-gray-700 text-gray-300">
+                        {{ icon('clock', '12') }} Normal
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-xs text-amber-500 font-bold mt-1 flex items-center gap-1">
+                    {{ icon('user', '12') }} {{ os.cliente }}
+                </p>
+            </div>
+            
+            <div class="p-4 flex-1 space-y-3">
+                <div class="bg-black bg-opacity-60 p-3 rounded-lg text-xs font-sans text-gray-300 border border-gray-800 whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar">{{ os.detalhes | safe }}</div>
+            </div>
+
+            <div class="p-4 bg-gray-950 border-t border-gray-800">
+                <form action="/api/producao/avancar-os" method="POST" onsubmit="return confirm('Confirmar o fim da montagem? A O.S. será enviada para a frota de INSTALAÇÃO.');">
+                    <input type="hidden" name="id_os" value="{{ os.id }}">
+                    <button type="submit" class="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest transition shadow-lg">
+                        {{ icon('package', '16') }} Enviar p/ Frota de Instalação
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full bg-gray-900 border border-gray-800 p-12 rounded-2xl text-center shadow-inner">
+            <div class="flex justify-center text-gray-600 mb-4 opacity-30">
+                {{ icon('tool', '64') }}
+            </div>
+            <p class="text-gray-400 font-medium text-lg">Bancada limpa!</p>
+            <p class="text-gray-500 text-sm mt-1">Nenhuma O.S. aguardando montagem.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="aba_entregues" class="aba-conteudo hidden animate-fade-in">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-gray-950 text-xs uppercase text-gray-500 border-b border-gray-800">
+                <tr><th class="p-4">Nº OS</th><th class="p-4">Cliente</th><th class="p-4">Status Atual</th></tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800 text-gray-300">
+                {% for os in os_entregues %}
+                <tr class="hover:bg-gray-800 transition">
+                    <td class="p-4 font-bold">#{{ os.numero_os }}</td>
+                    <td class="p-4">{{ os.cliente }}</td>
+                    <td class="p-4">
+                        <span class="inline-flex items-center gap-1 bg-emerald-900 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded uppercase border border-emerald-700">
+                            {{ icon('check-circle', '12') }} {{ os.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}<tr><td colspan="3" class="p-8 text-center text-gray-500">Sem histórico.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function mudarAba(idAba, botaoClicado) {
+    document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.add('hidden'));
+    document.getElementById(idAba).classList.remove('hidden');
+    
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-600', 'text-white');
+        btn.classList.add('bg-transparent', 'text-gray-400');
+    });
+    
+    botaoClicado.classList.remove('bg-transparent', 'text-gray-400');
+    botaoClicado.classList.add('bg-amber-600', 'text-white');
+}
+</script>
+{% endblock %}

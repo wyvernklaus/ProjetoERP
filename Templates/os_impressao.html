@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ordem de Serviço #{{ os.numero_os }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Regras estritas para forçar a impressora a imprimir em P&B perfeito */
+        @media print {
+            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page { size: A4; margin: 10mm; }
+            .no-print { display: none !important; }
+            .a4-sheet { box-shadow: none !important; margin: 0 !important; border: none !important; padding: 0 !important; width: 100% !important; }
+        }
+        body { background: #e5e7eb; }
+        .a4-sheet {
+            background: white; 
+            width: 210mm; 
+            min-height: 297mm;
+            margin: 40px auto; 
+            padding: 20mm; 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            border: 1px solid #d1d5db;
+        } 
+    </style>
+</head>
+<body class="text-black font-sans">
+    
+    <!-- Barra flutuante (Não sai na impressão) -->
+    <div class="no-print sticky top-0 z-50 flex justify-center py-4 bg-gray-900 border-b border-black shadow-xl gap-4">
+        <button onclick="window.print()" class="bg-white hover:bg-gray-200 text-black px-6 py-2 rounded-lg font-bold shadow uppercase tracking-wide text-sm transition border border-black hx-boost="true">
+            🖨️ Imprimir / Salvar PDF
+        </button>
+        <button onclick="window.close()" class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-bold shadow uppercase tracking-wide text-sm transition border border-gray-900 hx-boost="true">
+            Fechar
+        </button>
+    </div>
+
+    <!-- O "Papel" A4 -->
+    <div class="a4-sheet relative text-black">
+        
+        <!-- Cabeçalho da Empresa -->
+        <header class="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
+            <div>
+                <!-- Troque aqui o nome da sua empresa -->
+                <h1 class="text-3xl font-black tracking-tighter uppercase">NOME DA SUA EMPRESA</h1>
+                <p class="text-xs mt-1 font-bold">CNPJ: 00.000.000/0001-00</p>
+                <p class="text-xs mt-1">Av. Principal, 1000 - Rio de Janeiro, RJ</p>
+                <p class="text-xs">Tel: (21) 99999-9999 | Email: contato@empresa.com.br</p>
+            </div>
+            <div class="text-right">
+                <h2 class="text-2xl font-black uppercase tracking-widest">Ordem de Serviço</h2>
+                <p class="text-xl font-mono mt-1 font-bold">#{{ os.numero_os }}</p>
+                <p class="text-xs font-bold mt-2">Data de Emissão: {{ os.data_criacao.strftime('%d/%m/%Y') }}</p>
+            </div>
+        </header>
+
+        <!-- Dados do Cliente -->
+        <section class="mb-8">
+            <h3 class="bg-black text-white font-bold px-3 py-1 mb-3 uppercase text-[10px] tracking-widest inline-block">Dados do Contratante</h3>
+            <div class="grid grid-cols-2 gap-4 text-sm border border-black p-4">
+                <div><span class="font-bold uppercase text-[10px] block">Responsável Comercial:</span> <span class="font-medium">{{ os.cliente }}</span></div>
+                <div><span class="font-bold uppercase text-[10px] block">Razão Social / Empresa:</span> <span class="font-medium">{{ os.empresa if os.empresa else 'Particular (Pessoa Física)' }}</span></div>
+                <div class="col-span-2"><span class="font-bold uppercase text-[10px] block">Endereço de Instalação / Entrega:</span> <span class="font-medium">{{ os.endereco if os.endereco else 'Retirada na Fábrica' }}</span></div>
+                <div><span class="font-bold uppercase text-[10px] block">Prazo de Entrega Acordado:</span> <span class="font-bold">{{ os.data_entrega.split('-')|reverse|join('/') if os.data_entrega else 'A Combinar' }}</span></div>
+            </div>
+        </section>
+
+        <!-- Escopo e Detalhamento -->
+        <section class="mb-8">
+            <h3 class="bg-black text-white font-bold px-3 py-1 mb-3 uppercase text-[10px] tracking-widest inline-block">Escopo do Projeto e Execução</h3>
+            <div class="border-2 border-black p-5 min-h-[280px]">
+                {% set detalhes_limpos = os.detalhes.split('<br><hr><br><b>📍 HISTÓRICO DE RASTREIO:</b>')[0] %}
+                <pre class="font-sans text-sm whitespace-pre-wrap leading-relaxed">{{ detalhes_limpos | safe }}</pre>
+            </div>
+        </section>
+
+        <!-- Termos Jurídicos e Assinatura -->
+        <section class="absolute bottom-10 left-10 right-10">
+            <p class="text-[10px] text-justify mb-8 leading-tight">
+                <strong>TERMO DE ACEITE E RESPONSABILIDADE:</strong> O contratante declara ter lido, revisado e aprovado integralmente o escopo do projeto, materiais, artes gráficas e medidas descritos neste documento. Qualquer solicitação de alteração de layout ou material após a assinatura desta Ordem de Serviço acarretará na cobrança de custos adicionais e readequação de prazos de entrega. A produção será iniciada apenas mediante a assinatura deste termo e a validação do cronograma financeiro estabelecido.
+            </p>
+            
+            <div class="grid grid-cols-2 gap-16 text-center">
+                <div>
+                    <div class="border-t border-black pt-2 font-bold text-sm uppercase">Sua Empresa / Comercial</div>
+                    <div class="text-[10px] uppercase mt-1">Responsável pela Emissão</div>
+                </div>
+                <div>
+                    <div class="border-t border-black pt-2 font-bold text-sm uppercase">{{ os.cliente }}</div>
+                    <div class="text-[10px] uppercase mt-1">De Acordo / Assinatura do Cliente</div>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

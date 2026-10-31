@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}App Instalação - ERP{% endblock %}
+{% block content %}
+<header class="mb-4 flex items-center gap-3">
+    <div class="p-3 bg-emerald-500 bg-opacity-10 rounded-xl text-emerald-500 border border-emerald-500 border-opacity-20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+        {{ icon('truck', '32') }}
+    </div>
+    <div>
+        <h1 class="text-2xl font-black text-emerald-500 flex items-center gap-2">Instalações</h1>
+        <p class="text-gray-400 text-xs mt-1">Sua rota de serviços do dia.</p>
+    </div>
+</header>
+
+<div class="grid grid-cols-1 gap-5 max-w-lg mx-auto pb-6">
+    {% for os in ordens %}
+    <div class="bg-gray-900 border-t-4 border-emerald-500 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col">
+        
+        <div class="p-5 bg-gray-800 flex justify-between items-center border-b border-gray-700">
+            <div>
+                <span class="bg-gray-950 text-gray-400 border border-gray-700 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">OS #{{ os.numero_os }}</span>
+                <h3 class="text-lg font-black text-white mt-2">{{ os.cliente }}</h3>
+                <p class="text-[11px] text-emerald-400 font-bold uppercase flex items-center gap-1 mt-1">
+                    {{ icon('building-2', '12') }} {{ os.empresa if os.empresa else 'Cliente Físico' }}
+                </p>
+            </div>
+            {% if os.urgente %}
+            <div class="text-red-500 animate-pulse">
+                {{ icon('alert-triangle', '32') }}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="p-5 space-y-4 bg-gray-900">
+            <div>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                    {{ icon('map-pin', '12') }} Endereço de Instalação
+                </p>
+                <p class="text-sm text-gray-200 font-medium leading-tight">{{ os.endereco if os.endereco else 'Endereço não informado' }}</p>
+            </div>
+            
+            <div>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                    {{ icon('file-text', '12') }} Instruções / Materiais
+                </p>
+                <div class="bg-black bg-opacity-50 p-3 rounded-lg border border-gray-800 text-[11px] text-gray-300 font-sans whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">{{ os.detalhes | safe }}</div>
+            </div>
+        </div>
+
+        <div class="p-4 bg-gray-950 border-t border-gray-800 space-y-3">
+            <div class="flex gap-2">
+                <button onclick="abrirNoGoogleMaps('{{ os.endereco }}')" class="flex-1 flex items-center justify-center gap-1 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700 text-xs text-center transition shadow">
+                    {{ icon('map', '16') }} GPS
+                </button>
+                <button onclick="abrirNoWaze('{{ os.endereco }}')" class="flex-1 flex items-center justify-center gap-1 bg-blue-900 hover:bg-blue-800 text-blue-200 font-bold py-3 rounded-xl border border-blue-800 text-xs text-center transition shadow">
+                    {{ icon('car', '16') }} Waze
+                </button>
+            </div>
+            
+            <button onclick="iniciarEntrega({{ os.id }})" class="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl text-sm tracking-widest uppercase transition shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                {{ icon('check-circle', '18') }} Finalizar e Coletar Assinatura
+            </button>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-gray-900 border border-gray-800 p-8 rounded-2xl text-center shadow-inner mt-10">
+        <div class="flex justify-center text-gray-600 mb-4 opacity-40">
+            {{ icon('map', '64') }}
+        </div>
+        <p class="text-gray-300 font-bold text-lg">Rota Limpa!</p>
+        <p class="text-gray-500 text-sm mt-1">Nenhuma instalação pendente para você hoje.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="modalColetaDados" class="hidden fixed inset-0 bg-black bg-opacity-90 z-[60] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col">
+        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+            <h3 class="font-black text-lg text-emerald-400 flex items-center gap-2">
+                {{ icon('file-signature', '20') }} Comprovante de Entrega
+            </h3>
+            <button onclick="document.getElementById('modalColetaDados').classList.add('hidden')" class="text-gray-400 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+
+        <form action="/api/instalacao/concluir" method="POST" id="formEntrega" class="space-y-4">
+            <input type="hidden" name="id_os" id="entrega_id_os">
+            <input type="hidden" name="assinatura_base64" id="entrega_assinatura">
+
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nome de quem recebeu</label>
+                <input type="text" name="nome_recebedor" id="input_nome_rec" required placeholder="Ex: João da Silva" class="w-full bg-black border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+            
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Documento (CPF ou RG)</label>
+                <input type="text" name="documento_recebedor" id="input_doc_rec" required placeholder="Apenas números..." class="w-full bg-black border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-emerald-500 outline-none">
+            </div>
+
+            <div id="preview_assinatura" class="hidden mt-4 bg-white rounded-xl p-4 text-center border-4 border-emerald-900">
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-2">Assinatura Coletada:</p>
+                <img id="img_preview" src="" class="mx-auto max-h-24 object-contain pointer-events-none filter grayscale contrast-200">
+                <div class="border-t border-gray-300 mt-2 pt-2">
+                    <p id="preview_nome" class="text-black font-black text-sm uppercase"></p>
+                    <p id="preview_doc" class="text-gray-600 text-xs font-mono"></p>
+                </div>
+            </div>
+
+            <button type="button" id="btn_abrir_lousa" onclick="abrirLousaAssinatura()" class="w-full flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-emerald-400 font-black py-4 rounded-xl text-sm uppercase tracking-widest transition border border-emerald-900 mt-2">
+                {{ icon('edit-3', '18') }} Coletar Assinatura
+            </button>
+
+            <button type="submit" id="btn_enviar_servidor" class="hidden w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl text-sm uppercase tracking-widest transition shadow-[0_0_15px_rgba(16,185,129,0.3)] mt-2">
+                {{ icon('rocket', '18') }} Enviar e Encerrar O.S.
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="telaAssinatura" class="hidden fixed inset-0 bg-white z-[100] flex flex-col touch-none">
+    
+    <div class="flex justify-between items-center p-4 bg-gray-100 border-b border-gray-300 shadow-md">
+        <button onclick="fecharLousa()" class="text-red-600 font-bold uppercase text-xs px-3 py-2">Cancelar</button>
+        <h2 class="text-sm font-black text-gray-800 uppercase tracking-widest">Assine Abaixo</h2>
+        <button onclick="limparLousa()" class="text-gray-500 font-bold uppercase text-xs px-3 py-2">Limpar</button>
+    </div>
+
+    <div class="flex-1 relative w-full h-full bg-white" id="containerCanvas">
+        <canvas id="quadroCanvas" class="absolute inset-0 w-full h-full cursor-crosshair touch-none"></canvas>
+        <div class="absolute bottom-10 left-10 right-10 border-t-2 border-dashed border-gray-300 pointer-events-none">
+            <p class="text-center text-gray-400 font-bold uppercase text-[10px] mt-1">Rubrica do Cliente</p>
+        </div>
+    </div>
+
+    <div class="p-4 bg-gray-100 border-t border-gray-300">
+        <button onclick="salvarDesenho()" class="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white font-black py-4 rounded-xl text-lg uppercase tracking-widest shadow-lg">
+            {{ icon('check', '24') }} Confirmar Assinatura
+        </button>
+    </div>
+</div>
+
+<script>
+    // GPS Simples
+    function abrirNoGoogleMaps(endereco) {
+        if (!endereco || endereco.trim() === "") { alert("Endereço não informado na O.S."); return; }
+        const busca = encodeURIComponent(endereco + ", Rio de Janeiro - RJ");
+        window.open(`https://www.google.com/maps/search/?api=1&query=${busca}`, '_blank');
+    }
+    function abrirNoWaze(endereco) {
+        if (!endereco || endereco.trim() === "") { alert("Endereço não informado na O.S."); return; }
+        const busca = encodeURIComponent(endereco + ", Rio de Janeiro - RJ");
+        window.open(`https://waze.com/ul?q=${busca}`, '_blank');
+    }
+
+    function iniciarEntrega(id_os) {
+        document.getElementById('formEntrega').reset();
+        document.getElementById('entrega_assinatura').value = '';
+        document.getElementById('preview_assinatura').classList.add('hidden');
+        document.getElementById('btn_enviar_servidor').classList.add('hidden');
+        document.getElementById('btn_abrir_lousa').classList.remove('hidden');
+        
+        document.getElementById('entrega_id_os').value = id_os;
+        document.getElementById('modalColetaDados').classList.remove('hidden');
+    }
+
+    // 🚨 TRAVA MÁGICA: Impede o teclado do celular de enviar sem assinar
+    document.getElementById('formEntrega').addEventListener('submit', function(e) {
+        const assinatura = document.getElementById('entrega_assinatura').value;
+        if (!assinatura || assinatura.trim() === "") {
+            e.preventDefault(); 
+            abrirLousaAssinatura(); 
+        }
+    });
+
+    const telaLousa = document.getElementById('telaAssinatura');
+    const canvas = document.getElementById('quadroCanvas');
+    const ctx = canvas.getContext('2d');
+    let desenhando = false;
+
+    function ajustarTamanhoCanvas() {
+        const container = document.getElementById('containerCanvas');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#000000";
+    }
+
+    function abrirLousaAssinatura() {
+        const nome = document.getElementById('input_nome_rec').value.trim();
+        const doc = document.getElementById('input_doc_rec').value.trim();
+        
+        if(!nome || !doc) {
+            alert("⚠️ Por favor, preencha o Nome e o Documento do cliente antes de coletar a assinatura!");
+            return;
+        }
+
+        telaLousa.classList.remove('hidden');
+        setTimeout(ajustarTamanhoCanvas, 50); 
+    }
+
+    function fecharLousa() {
+        telaLousa.classList.add('hidden');
+    }
+
+    function limparLousa() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function pegarPosicao(e) {
+        const rect = canvas.getBoundingClientRect();
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+        }
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function comecarDesenho(e) {
+        e.preventDefault();
+        desenhando = true;
+        const pos = pegarPosicao(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+    }
+
+    function desenhar(e) {
+        e.preventDefault();
+        if (!desenhando) return;
+        const pos = pegarPosicao(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+    }
+
+    function pararDesenho(e) {
+        e.preventDefault();
+        desenhando = false;
+    }
+
+    canvas.addEventListener('mousedown', comecarDesenho);
+    canvas.addEventListener('mousemove', desenhar);
+    canvas.addEventListener('mouseup', pararDesenho);
+    canvas.addEventListener('mouseout', pararDesenho);
+
+    canvas.addEventListener('touchstart', comecarDesenho, {passive: false});
+    canvas.addEventListener('touchmove', desenhar, {passive: false});
+    canvas.addEventListener('touchend', pararDesenho, {passive: false});
+    canvas.addEventListener('touchcancel', pararDesenho, {passive: false});
+
+    function salvarDesenho() {
+        const blankCanvas = document.createElement('canvas');
+        blankCanvas.width = canvas.width; blankCanvas.height = canvas.height;
+        if(canvas.toDataURL() === blankCanvas.toDataURL()) {
+            alert("⚠️ O quadro está em branco. Peça para o cliente rubricar!");
+            return;
+        }
+
+        const imagemAssinatura = canvas.toDataURL("image/png");
+        document.getElementById('entrega_assinatura').value = imagemAssinatura;
+
+        document.getElementById('img_preview').src = imagemAssinatura;
+        document.getElementById('preview_nome').innerText = document.getElementById('input_nome_rec').value;
+        document.getElementById('preview_doc').innerText = "DOC: " + document.getElementById('input_doc_rec').value;
+        
+        document.getElementById('preview_assinatura').classList.remove('hidden');
+        document.getElementById('btn_abrir_lousa').classList.add('hidden');
+        document.getElementById('btn_enviar_servidor').classList.remove('hidden');
+
+        fecharLousa();
+    }
+</script>
+{% endblock %}

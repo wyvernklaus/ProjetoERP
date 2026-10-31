@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Auditoria - ERP{% endblock %}
+{% block content %}
+
+<header class="mb-8 flex justify-between items-center border-b border-gray-800 pb-6">
+    <div>
+        <h1 class="text-3xl font-black text-gray-200">🗄️ Histórico Geral & Auditoria</h1>
+        <p class="text-gray-400 mt-1 uppercase font-bold text-xs tracking-widest">Base de dados completa de Ordens de Serviço</p>
+    </div>
+    <button onclick="history.back()" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest border border-gray-600 transition shadow hx-boost="true">
+        ⬅ Voltar
+    </button>
+</header>
+
+<div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+    <table class="w-full text-left border-collapse text-sm">
+        <thead>
+            <tr class="bg-gray-950 text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-800">
+                <th class="p-4">Nº OS / Criador</th>
+                <th class="p-4">Cliente e Empresa</th>
+                <th class="p-4">Status Atual</th>
+                <th class="p-4 text-center">Ações de Auditoria</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-800">
+            {% for os in ordens %}
+            <tr class="hover:bg-gray-800 transition text-gray-300 hx-boost="true">
+                <td class="p-4">
+                    <span class="font-black text-lg text-blue-400">#{{ os.numero_os }}</span><br>
+                    <span class="text-[10px] text-gray-500 uppercase">Por: {{ os.criado_por }}</span>
+                </td>
+                <td class="p-4">
+                    <p class="font-bold text-gray-200">{{ os.cliente }}</p>
+                    <p class="text-xs text-amber-500">{{ os.empresa }}</p>
+                </td>
+                <td class="p-4">
+                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest border {{ 'bg-emerald-900 text-emerald-300 border-emerald-700' if os.status == 'Concluído' else 'bg-gray-800 text-gray-400 border-gray-600' }}">{{ os.status }}</span>
+                </td>
+                <td class="p-4 flex flex-col gap-2 items-center justify-center">
+                    
+                    <button onclick='abrirAuditoria({{ os.numero_os }}, {{ os.detalhes | tojson | safe }})' class="w-full max-w-[160px] bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg text-[10px] uppercase transition shadow border border-gray-600 flex items-center justify-center gap-1 hx-boost="true">
+                        <span>👁️</span> Informaçoes de Produção
+                    </button>
+                    
+                    <a href="/os/{{ os.id }}/imprimir" target="_blank" class="w-full max-w-[160px] bg-indigo-900 hover:bg-indigo-800 text-indigo-200 font-bold py-2 px-3 rounded-lg text-[10px] uppercase transition shadow border border-indigo-700 flex items-center justify-center gap-1 hx-boost="true">
+                        <span>📄</span> PDF Assinado
+                    </a>
+
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="p-8 text-center text-gray-500">Nenhum registro encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="modalAuditoria" class="hidden fixed inset-0 bg-black bg-opacity-90 z-[70] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-4 bg-gray-950 border-b border-gray-800 flex justify-between items-center">
+            <h3 class="font-black text-xl text-blue-500">Dossiê Interno O.S. <span id="audit_num"></span></h3>
+            <button onclick="document.getElementById('modalAuditoria').classList.add('hidden')" class="text-gray-400 hover:text-white text-3xl font-light">&times;</button>
+        </div>
+        <div class="p-6 overflow-y-auto custom-scrollbar bg-black text-gray-300 text-xs font-sans whitespace-pre-wrap leading-relaxed" id="audit_conteudo">
+        </div>
+    </div>
+</div>
+
+<script>
+    function abrirAuditoria(num, detalhes) {
+        document.getElementById('audit_num').innerText = "#" + num;
+        document.getElementById('audit_conteudo').innerHTML = detalhes;
+        document.getElementById('modalAuditoria').classList.remove('hidden');
+    }
+</script>
+{% endblock %}

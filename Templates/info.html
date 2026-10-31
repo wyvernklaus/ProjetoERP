@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+{% from "macros/icons.html" import icon %}
+{% block title %}Minhas Informações - ERP{% endblock %}
+
+{% block content %}
+<header class="mb-8 flex items-center gap-3">
+    <div class="p-3 bg-blue-500 bg-opacity-10 rounded-xl text-blue-500 border border-blue-500 border-opacity-20 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+        {{ icon('user-circle', '32') }}
+    </div>
+    <div>
+        <h1 class="text-3xl font-bold text-gray-100">Painel de Informações</h1>
+        <p class="text-gray-400">Consulte seus dados profissionais e acesse a área privada.</p>
+    </div>
+</header>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <div class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md h-fit">
+        <h3 class="text-xl font-bold text-blue-400 mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+            {{ icon('id-card', '20') }} Perfil Profissional
+        </h3>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs uppercase font-bold text-gray-500">Nome Completo</label>
+                <p class="text-lg text-white font-medium">{{ usuario.nome }}</p>
+            </div>
+            <div>
+                <label class="block text-xs uppercase font-bold text-gray-500">Cargo / Função</label>
+                <p class="text-lg text-yellow-500 font-medium">{{ usuario.cargo }}</p>
+            </div>
+            <div>
+                <label class="block text-xs uppercase font-bold text-gray-500">Endereço / Rota (VT)</label>
+                <p class="text-sm text-gray-300 font-mono flex items-center gap-2">
+                    {{ icon('map-pin', '14') }} {{ usuario.endereco_vt if usuario.endereco_vt else 'Não informado' }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md lg:col-span-2">
+        <h3 class="text-xl font-bold text-red-400 mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
+            {{ icon('lock', '20') }} Área Protegida
+        </h3>
+
+        <div id="bloco-bloqueado" class="space-y-4">
+            <p class="text-gray-400 text-sm flex items-center gap-2">
+                {{ icon('info', '16') }} Para visualizar seus dados, saldo de horas e configurações, digite sua senha de login.
+            </p>
+            <div class="flex gap-2">
+                <input type="password" id="input-senha-confirmacao" placeholder="Sua senha..." class="w-full max-w-xs bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-red-500 transition">
+                <button onclick="enviarValidacaoPrivada()" class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition shadow">
+                    {{ icon('unlock', '16') }} Destrancar
+                </button>
+            </div>
+            <p id="erro-modal" class="text-red-500 text-xs font-bold hidden"></p>
+        </div>
+
+        <div id="bloco-desbloqueado" class="hidden space-y-6">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-gray-900 p-4 rounded border border-gray-700 flex justify-between items-center gap-4">
+                    <div>
+                        <p class="text-xs text-gray-500 font-bold uppercase flex items-center gap-1">{{ icon('clock', '12') }} Saldo de Horas (Mês)</p>
+                        <p class="text-xl font-bold text-blue-400 mt-1" id="txt-horas">--</p>
+                        <p class="text-[10px] text-amber-400 font-medium mt-2 flex items-center gap-1">
+                            {{ icon('calendar-clock', '12') }} Limite p/ compensar: <span id="txt-prazo-compensacao" class="font-bold underline">--/--/----</span>
+                        </p>
+                    </div>
+                    <button onclick="abrirHistoricoPontos()" class="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 border border-blue-700 text-white font-bold py-2 px-3 rounded text-xs transition shadow h-fit cursor-pointer">
+                        {{ icon('bar-chart', '14') }} Ver Ponto
+                    </button>
+                </div>
+                
+                {% if 'comercial' in usuario.abas_permitidas %}
+                <div class="bg-gray-900 p-4 rounded border border-gray-700 flex flex-col justify-center">
+                    <p class="text-xs text-gray-500 font-bold uppercase flex items-center gap-1">{{ icon('dollar-sign', '12') }} Comissões / Vendas</p>
+                    <p class="text-xl font-bold text-green-400 mt-1" id="txt-vendas">--</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="border-t border-gray-700 pt-6 mt-4">
+                <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wide mb-4 flex items-center gap-2">
+                    {{ icon('shield', '16') }} Painel de Segurança e Solicitações
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    
+                    <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl flex flex-col justify-between">
+                        <div>
+                            <h5 class="text-white font-bold text-sm flex items-center gap-2">{{ icon('key', '16') }} Chave de Acesso</h5>
+                            <p class="text-[11px] text-gray-400 mt-1">Deseja trocar sua senha atual? Dispare um link seguro para o seu e-mail.</p>
+                        </div>
+                        <button onclick="solicitarAutoReset(this)" class="mt-4 w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded text-xs transition shadow">
+                            {{ icon('mail', '14') }} Disparar Nova Senha
+                        </button>
+                    </div>
+
+                    <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl flex flex-col justify-between">
+                        <div>
+                            <h5 class="text-white font-bold text-sm flex items-center gap-2">{{ icon('at-sign', '16') }} E-mail Corporativo</h5>
+                            <p class="text-[11px] text-gray-400 mt-1">Altere seu endereço de e-mail recebendo um link de validação.</p>
+                            <div class="mt-2"><input type="email" id="input-novo-email" value="{{ usuario.email if usuario.email else '' }}" class="w-full bg-black border border-gray-700 rounded p-1.5 text-xs text-white outline-none focus:border-green-500 transition"></div>
+                        </div>
+                        <button onclick="atualizarEmailCorporativo(this)" class="mt-4 w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-3 rounded text-xs transition shadow">
+                            {{ icon('check-circle', '14') }} Validar e Salvar
+                        </button>
+                    </div>
+
+                    <form action="/api/info/solicitar-vt" method="POST" enctype="multipart/form-data" class="bg-gray-900 border border-gray-800 p-4 rounded-xl flex flex-col justify-between md:col-span-2 xl:col-span-1">
+                        <div>
+                            <h5 class="text-white font-bold text-sm flex items-center gap-2">{{ icon('bus', '16') }} Atualizar Vale Transporte</h5>
+                            <p class="text-[11px] text-gray-400 mt-1">Envie o novo itinerário e o comprovante para o RH.</p>
+                            <div class="mt-2 space-y-2">
+                                <input type="text" name="novo_vt" placeholder="Ex: Linha 415..." required class="w-full bg-black border border-gray-700 rounded p-1.5 text-xs text-white outline-none focus:border-purple-500 transition">
+                                <input type="file" name="file" required class="w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gray-800 file:text-gray-200 hover:file:bg-gray-700 cursor-pointer">
+                            </div>
+                        </div>
+                        <button type="submit" class="mt-4 w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-3 rounded text-xs transition shadow">
+                            {{ icon('upload', '14') }} Enviar Pedido ao RH
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div id="modalHistoricoPonto" class="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center hidden p-4 animate-fade-in">
+    <div class="bg-gray-900 border border-gray-800 w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-4 bg-gray-950 border-b border-gray-800 flex justify-between items-center shrink-0">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                {{ icon('bar-chart', '20') }} Detalhamento e Histórico de Ponto
+            </h3>
+            <button onclick="fecharHistoricoPontos()" class="text-gray-400 hover:text-white text-2xl font-bold p-1 leading-none cursor-pointer">&times;</button>
+        </div>
+        
+        <div class="p-6 overflow-y-auto space-y-8">
+            
+            {% if espelho %}
+            <div>
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <h4 class="text-sm font-bold text-gray-300 uppercase tracking-wide flex items-center gap-2">
+                        {{ icon('calendar', '16') }} Cartão de Ponto (Mês Ativo)
+                    </h4>
+                    
+                    {% if is_bloqueado %}
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button onclick="exportarMesEspecifico('{{ espelho.detalhes_dias[0].data_raw[:7] }}')" class="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-green-700 hover:bg-green-600 text-white font-bold py-1.5 px-3 rounded text-xs transition shadow cursor-pointer">
+                            {{ icon('download', '14') }} Exportar
+                        </button>
+                        <button onclick="solicitarEmailMesEspecifico('{{ espelho.detalhes_dias[0].data_raw[:7] }}', this)" class="flex-1 sm:flex-none flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 px-3 rounded text-xs transition shadow cursor-pointer">
+                            {{ icon('mail', '14') }} E-mail
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% if is_bloqueado %}
+                <div class="bg-green-900 bg-opacity-20 border border-green-800 text-green-400 text-xs p-3 rounded mb-4 font-bold flex items-center gap-2">
+                    {{ icon('check-circle', '16') }} HOMOLOGADO: Este mês já foi validado e fechado pelo RH. Opções de download e exportação liberadas acima!
+                </div>
+                {% else %}
+                <div class="bg-amber-900 bg-opacity-20 border border-amber-800 text-amber-400 text-xs p-3 rounded mb-4 font-bold flex items-center gap-2">
+                    {{ icon('alert-triangle', '16') }} EM AUDITORIA: O RH está avaliando este mês. Você ainda pode justificar as inconsistências abaixo de forma proativa.
+                </div>
+                {% endif %}
+
+                <div class="bg-gray-950 p-4 rounded border border-gray-800 overflow-x-auto max-h-80 overflow-y-auto">
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="sticky top-0 bg-gray-950 z-10">
+                            <tr class="border-b border-gray-800 text-gray-500 font-bold text-xs uppercase">
+                                <th class="pb-2">Data</th>
+                                <th class="pb-2">Status</th>
+                                <th class="pb-2">Batidas Registradas</th>
+                                <th class="pb-2 text-right">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dia in espelho.detalhes_dias %}
+                            <tr class="border-b border-gray-800 hover:bg-gray-900 transition">
+                                <td class="py-2 font-medium">{{ dia.data }}</td>
+                                <td class="py-2">
+                                    {% if dia.falta %} <span class="text-red-400 font-bold text-xs flex items-center gap-1">{{ icon('x-circle', '12') }} Falta</span>
+                                    {% elif dia.inconsistente %} <span class="text-amber-400 font-bold text-xs flex items-center gap-1">{{ icon('alert-triangle', '12') }} Erro</span>
+                                    {% else %} <span class="text-gray-400 text-xs">{{ dia.tipo_dia }}</span> {% endif %}
+                                </td>
+                                <td class="py-2 font-mono text-green-400 font-bold">{{ dia.batidas | join(" - ") if dia.batidas else '--:--' }}</td>
+                                <td class="py-2 text-right">
+                                    {% if not is_bloqueado %}
+                                        {% if dia.inconsistente or dia.falta %}
+                                            <button onclick="justificarPonto('{{ dia.data_raw }}')" class="flex items-center gap-1 ml-auto bg-amber-600 hover:bg-amber-500 text-white font-bold py-0.5 px-2 rounded text-[10px] uppercase transition shadow cursor-pointer">
+                                                {{ icon('edit-2', '12') }} Justificar
+                                            </button>
+                                        {% else %}
+                                            <span class="text-[10px] text-gray-600 font-bold uppercase flex items-center gap-1 justify-end">{{ icon('check', '12') }} Ok</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1 justify-end">{{ icon('lock', '12') }} Fechado</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+             
+            <div class="border-t border-gray-800 pt-6">
+                <h4 class="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2">
+                    {{ icon('folder-open', '16') }} Resumo de Meses Anteriores
+                </h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-gray-300 border-collapse">
+                        <thead>
+                            <tr class="border-b border-gray-800 text-gray-500 uppercase font-bold tracking-wider">
+                                <th class="pb-3">Mês de Referência</th>
+                                <th class="pb-3">Horas Trabalhadas</th>
+                                <th class="pb-3">Saldo Final</th>
+                                <th class="pb-3 text-center">Status do Arquivo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-historico-meses" class="divide-y divide-gray-800"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+window.historicoMestre = [];
+
+async function enviarValidacaoPrivada() {
+    const senhaDigitada = document.getElementById('input-senha-confirmacao').value;
+    const erroTxt = document.getElementById('erro-modal');
+    if(!senhaDigitada) return;
+    const formData = new FormData(); formData.append('senha', senhaDigitada);
+    try {
+        const response = await fetch('/api/validar-acesso-privado', { method: 'POST', body: formData });
+        if (!response.ok) throw new Error('Incorreta.');
+        const dados = await response.json();
+        if (document.getElementById('txt-vendas')) document.getElementById('txt-vendas').innerText = dados.vendas_mes;
+        document.getElementById('txt-horas').innerText = dados.banco_horas;
+        
+        const prazo = new Date(); prazo.setMonth(prazo.getMonth() + 6);
+        document.getElementById('txt-prazo-compensacao').innerText = `${String(prazo.getDate()).padStart(2,'0')}/${String(prazo.getMonth()+1).padStart(2,'0')}/${prazo.getFullYear()}`;
+        document.getElementById('bloco-bloqueado').classList.add('hidden');
+        document.getElementById('bloco-desbloqueado').classList.remove('hidden');
+    } catch (error) { erroTxt.innerText = "Senha incorreta!"; erroTxt.classList.remove('hidden'); }
+}
+
+document.getElementById('input-senha-confirmacao').addEventListener('keypress', function (e) { if (e.key === 'Enter') enviarValidacaoPrivada(); });
+
+async function abrirHistoricoPontos() {
+    document.getElementById('modalHistoricoPonto').classList.remove('hidden');
+    const tabelaBody = document.getElementById('lista-historico-meses');
+    tabelaBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-500 flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Carregando histórico...</td></tr>';
+    lucide.createIcons();
+    
+    try {
+        const res = await fetch("/api/usuarios/meu-historico-pontos"); 
+        const dados = await res.json(); 
+        window.historicoMestre = dados.historico; 
+        tabelaBody.innerHTML = '';
+        
+        if(dados.historico && dados.historico.length > 0) {
+            const historicoLiberado = dados.historico.filter(h => h.bloqueado);
+            
+            if(historicoLiberado.length > 0) {
+                historicoLiberado.forEach(h => {
+                    const colSaldo = h.saldo_mes.includes("-") ? "text-red-400" : "text-green-400";
+                    
+                    const colunaAcaoHtml = `
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="exportarMesEspecifico('${h.mes_ano}')" class="flex items-center gap-1 bg-green-700 hover:bg-green-600 text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase shadow cursor-pointer transition">{{ icon('download', '12') }} Planilha</button>
+                            <button onclick="solicitarEmailMesEspecifico('${h.mes_ano}', this)" class="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-1.5 px-3 rounded text-[10px] uppercase shadow cursor-pointer transition">{{ icon('mail', '12') }} E-mail</button>
+                        </div>
+                    `;
+                    
+                    tabelaBody.innerHTML += `
+                        <tr class="hover:bg-gray-950 transition border-b border-gray-800">
+                            <td class="p-4 text-white font-semibold text-sm">${h.nome_mes}</td>
+                            <td class="p-4 font-mono text-gray-400 text-xs">${h.total_trabalhado}</td>
+                            <td class="p-4 font-mono font-bold text-sm ${colSaldo}">${h.saldo_mes}</td>
+                            <td class="p-4 text-center">${colunaAcaoHtml}</td>
+                        </tr>
+                    `;
+                });
+                lucide.createIcons();
+            } else {
+                tabelaBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-500">Nenhum relatório de ponto foi disponibilizado pelo RH ainda.</td></tr>';
+            }
+        } else {
+            tabelaBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-gray-500">Nenhum registro de ponto encontrado.</td></tr>';
+        }
+    } catch(e) { 
+        tabelaBody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-red-400">Falha ao conectar com o banco de dados.</td></tr>'; 
+    }
+}
+
+function fecharHistoricoPontos() { document.getElementById('modalHistoricoPonto').classList.add('hidden'); }
+
+function abrirPainelErros(mesAno) {
+    const mes = window.historicoMestre.find(m => m.mes_ano === mesAno);
+    if(!mes) return;
+    
+    let modal = document.getElementById('modalCorrecaoInvisivel');
+    if(!modal) {
+        document.body.insertAdjacentHTML('beforeend', `
+        <div id="modalCorrecaoInvisivel" class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center hidden p-4">
+            <div class="bg-gray-900 border border-gray-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-4 bg-gray-950 border-b border-gray-800 flex justify-between items-center">
+                    <h3 class="text-base font-bold text-amber-500 flex items-center gap-2"><i data-lucide="edit-3" class="w-5 h-5"></i> Corrigir Inconsistências</h3>
+                    <button onclick="document.getElementById('modalCorrecaoInvisivel').classList.add('hidden')" class="text-gray-400 hover:text-white text-xl font-bold p-1 cursor-pointer">&times;</button>
+                </div>
+                <div id="conteudo-erros-ponto" class="p-4 overflow-y-auto space-y-4"></div>
+            </div>
+        </div>`);
+        modal = document.getElementById('modalCorrecaoInvisivel');
+    }
+    
+    let html = '<p class="text-xs text-gray-400 mb-2">Preencha os horários corretos e envie. O RH irá avaliar e aplicar a sua sugestão.</p>';
+    
+    mes.dias_erro.forEach(d => {
+        const b = d.batidas || []; 
+        
+        html += `
+        <div class="bg-gray-800 p-4 rounded border border-gray-700 shadow-sm" id="card_erro_${d.data_raw}">
+            <p class="text-white font-bold mb-2 flex justify-between items-center">
+                <span>Dia ${d.data}</span>
+                <span class="text-[10px] text-amber-400 uppercase tracking-wide flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> Pendente</span>
+            </p>
+            <div class="grid grid-cols-4 gap-2 mb-2">
+                <div><label class="text-[9px] text-gray-500 uppercase">Entrada</label><input type="time" id="b1_${d.data_raw}" class="w-full bg-gray-950 border border-gray-600 rounded p-1 text-white text-xs text-center" value="${b[0]||''}"></div>
+                <div><label class="text-[9px] text-gray-500 uppercase">Almoço</label><input type="time" id="b2_${d.data_raw}" class="w-full bg-gray-950 border border-gray-600 rounded p-1 text-white text-xs text-center" value="${b[1]||''}"></div>
+                <div><label class="text-[9px] text-gray-500 uppercase">Retorno</label><input type="time" id="b3_${d.data_raw}" class="w-full bg-gray-950 border border-gray-600 rounded p-1 text-white text-xs text-center" value="${b[2]||''}"></div>
+                <div><label class="text-[9px] text-gray-500 uppercase">Saída</label><input type="time" id="b4_${d.data_raw}" class="w-full bg-gray-950 border border-gray-600 rounded p-1 text-white text-xs text-center" value="${b[3]||''}"></div>
+            </div>
+            <input type="text" id="motivo_${d.data_raw}" placeholder="Motivo (Ex: Esqueci de bater a volta)..." class="w-full bg-gray-950 border border-gray-600 rounded p-1.5 text-xs text-white mb-3">
+            <button onclick="enviarCorrecaoPonto('${mesAno}', '${d.data_raw}', '${d.data}')" class="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold py-1.5 rounded text-xs transition shadow"><i data-lucide="send" class="w-3 h-3"></i> Enviar p/ Aprovação do RH</button>
+        </div>
+        `;
+    });
+    
+    document.getElementById('conteudo-erros-ponto').innerHTML = html;
+    lucide.createIcons();
+    modal.classList.remove('hidden');
+}
+
+async function enviarCorrecaoPonto(mesAno, dataRaw, dataTexto) {
+    const b1 = document.getElementById(`b1_${dataRaw}`).value; const b2 = document.getElementById(`b2_${dataRaw}`).value;
+    const b3 = document.getElementById(`b3_${dataRaw}`).value; const b4 = document.getElementById(`b4_${dataRaw}`).value;
+    const motivo = document.getElementById(`motivo_${dataRaw}`).value;
+    
+    if(!motivo) { alert("Por favor, digite um motivo para a correção (Ex: Esqueci meu crachá)."); return; }
+    
+    const fd = new FormData();
+    fd.append("mes_ano", mesAno); fd.append("data_raw", dataRaw); fd.append("data_texto", dataTexto);
+    fd.append("b1", b1); fd.append("b2", b2); fd.append("b3", b3); fd.append("b4", b4); fd.append("motivo", motivo);
+    
+    try {
+        const res = await fetch('/api/usuarios/justificar-ponto', { method: 'POST', body: fd });
+        if((await res.json()).status === "sucesso") {
+            alert("✅ Correção enviada com sucesso! O RH foi notificado.");
+            document.getElementById(`card_erro_${dataRaw}`).innerHTML = '<p class="text-green-400 font-bold text-center py-4 bg-green-900 bg-opacity-20 rounded border border-green-800 flex items-center justify-center gap-2"><i data-lucide="check-circle" class="w-5 h-5"></i> Em análise pela Administração</p>';
+            lucide.createIcons();
+        }
+    } catch(e) { alert("Erro de comunicação."); }
+}
+
+function exportarMesEspecifico(mesAno) {
+    let csv = ["\ufeffMês de Referência;Status;Saldo"];
+    csv.push(`${mesAno};Homologado Oficial;Disponível`);
+    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" })); link.setAttribute("download", `Espelho_Ponto_${mesAno}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+}
+async function solicitarEmailMesEspecifico(mesAno, botao) {
+    const txt = botao.innerHTML; botao.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>'; botao.disabled = true;
+    lucide.createIcons();
+    try {
+        const res = await fetch("/api/usuarios/enviar-ponto-email", { method: "POST" });
+        if((await res.json()).status === "sucesso") alert(`✉️ Sucesso! O espelho consolidado foi disparado para seu e-mail.`);
+    } catch(e) { alert("Erro de rede."); }
+    botao.innerHTML = txt; botao.disabled = false;
+    lucide.createIcons();
+}
+
+async function solicitarAutoReset(b) { 
+    const txt = b.innerHTML;
+    b.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>'; 
+    lucide.createIcons();
+    try { 
+        const res = await fetch("/api/usuarios/auto-solicitar-reset", { method: "POST" }); 
+        if((await res.json()).status === "sucesso") b.innerHTML = '<i data-lucide="check" class="w-4 h-4"></i> Link no e-mail!'; 
+    } catch(e){} 
+    lucide.createIcons();
+}
+
+async function atualizarEmailCorporativo(b) { 
+    const e = document.getElementById('input-novo-email').value.trim(); 
+    if(!e) return; 
+    const txt = b.innerHTML;
+    b.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>'; 
+    lucide.createIcons();
+    const fd = new FormData(); fd.append("novo_email", e); 
+    try { 
+        const res = await fetch("/api/info/solicitar-troca-email", { method: "POST", body: fd }); 
+        if((await res.json()).status === "sucesso") {
+            alert("🔒 Verifique o novo e-mail!");
+            b.innerHTML = txt;
+        }
+    } catch(e){} 
+    lucide.createIcons();
+}
+</script>
+{% endblock %}
