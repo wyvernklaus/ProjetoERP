@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = Field(..., min_length=32)
     ALGORITHM: str = "HS256"
 
+    # Criptografia em repouso (chave para cifrar dados sensíveis no banco)
+    ENCRYPTION_KEY: str = Field(..., min_length=16)
+
     # E-mail
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
